@@ -1,0 +1,26 @@
+{
+  "people": [
+    {
+      "id": 547179,
+      "fullName": "Michael Lorenzen",
+      "stats": [
+        {
+          "group": { "displayName": "pitching" },
+          "splits": [
+            {
+              "stat": {
+                "era": "9.00",
+                "whip": "2.31",
+                "wins": 0,
+                "losses": 1,
+                "strikeOuts": 10,
+                "inningsPitched": "13.0",
+                "gamesStarted": 3
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

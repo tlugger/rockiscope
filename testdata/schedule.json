@@ -1,0 +1,52 @@
+{
+  "dates": [
+    {
+      "games": [
+        {
+          "gamePk": 778899,
+          "gameDate": "2026-04-08T19:10:00Z",
+          "status": {
+            "abstractGameState": "Preview"
+          },
+          "teams": {
+            "away": {
+              "score": 0,
+              "team": {
+                "id": 117,
+                "name": "Houston Astros"
+              },
+              "leagueRecord": {
+                "wins": 7,
+                "losses": 4,
+                "pct": ".636"
+              },
+              "probablePitcher": {
+                "id": 621111,
+                "fullName": "Framber Valdez"
+              }
+            },
+            "home": {
+              "score": 0,
+              "team": {
+                "id": 115,
+                "name": "Colorado Rockies"
+              },
+              "leagueRecord": {
+                "wins": 5,
+                "losses": 6,
+                "pct": ".455"
+              },
+              "probablePitcher": {
+                "id": 547179,
+                "fullName": "Michael Lorenzen"
+              }
+            }
+          },
+          "venue": {
+            "name": "Coors Field"
+          }
+        }
+      ]
+    }
+  ]
+}

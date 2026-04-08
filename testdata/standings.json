@@ -1,0 +1,42 @@
+{
+  "records": [
+    {
+      "teamRecords": [
+        {
+          "team": { "id": 115 },
+          "wins": 5,
+          "losses": 6,
+          "winningPercentage": ".455",
+          "runsScored": 50,
+          "runsAllowed": 45,
+          "runDifferential": 5,
+          "streak": { "streakCode": "W2" },
+          "records": {
+            "splitRecords": [
+              { "wins": 3, "losses": 2, "type": "home" },
+              { "wins": 2, "losses": 4, "type": "away" },
+              { "wins": 5, "losses": 5, "type": "lastTen" }
+            ]
+          }
+        },
+        {
+          "team": { "id": 119 },
+          "wins": 8,
+          "losses": 3,
+          "winningPercentage": ".727",
+          "runsScored": 60,
+          "runsAllowed": 30,
+          "runDifferential": 30,
+          "streak": { "streakCode": "W5" },
+          "records": {
+            "splitRecords": [
+              { "wins": 4, "losses": 1, "type": "home" },
+              { "wins": 4, "losses": 2, "type": "away" },
+              { "wins": 7, "losses": 3, "type": "lastTen" }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
