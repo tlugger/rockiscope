@@ -1,15 +1,17 @@
 [Unit]
-Description=Rockiscope
-After=network.target
+Description=Rockiscope - Rockies Horoscope Bot
+After=network-online.target
+Wants=network-online.target
 
 [Service]
+Type=simple
 WorkingDirectory=/home/pi/rockiscope
-EnvironmentFile=/home/pi/rockiscope/twitter.env
-ExecStart=/home/pi/rockiscope/venv/bin/python /home/pi/rockiscope/main.py
-ExecReload=/bin/kill -HUP $MAINPID
-StandardOutput=file:/home/pi/rockiscope/logs/rockiscope.log
-KillMode=process
+EnvironmentFile=/home/pi/rockiscope/.env
+ExecStart=/home/pi/rockiscope/rockiscope
 Restart=always
+RestartSec=30
+StandardOutput=append:/home/pi/rockiscope/rockiscope.log
+StandardError=append:/home/pi/rockiscope/rockiscope.log
 
 [Install]
 WantedBy=multi-user.target

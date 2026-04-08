@@ -1,0 +1,70 @@
+{
+  "dates": [
+    {
+      "games": [
+        {
+          "gamePk": 1001,
+          "gameDate": "2026-03-30T20:10:00Z",
+          "status": { "abstractGameState": "Final" },
+          "teams": {
+            "away": {
+              "score": 3,
+              "team": { "id": 115, "name": "Colorado Rockies" },
+              "leagueRecord": { "wins": 1, "losses": 0, "pct": "1.000" }
+            },
+            "home": {
+              "score": 1,
+              "team": { "id": 117, "name": "Houston Astros" },
+              "leagueRecord": { "wins": 0, "losses": 1, "pct": ".000" }
+            }
+          },
+          "venue": { "name": "Minute Maid Park" }
+        }
+      ]
+    },
+    {
+      "games": [
+        {
+          "gamePk": 1002,
+          "gameDate": "2026-03-31T20:10:00Z",
+          "status": { "abstractGameState": "Final" },
+          "teams": {
+            "away": {
+              "score": 2,
+              "team": { "id": 115, "name": "Colorado Rockies" },
+              "leagueRecord": { "wins": 1, "losses": 1, "pct": ".500" }
+            },
+            "home": {
+              "score": 5,
+              "team": { "id": 117, "name": "Houston Astros" },
+              "leagueRecord": { "wins": 1, "losses": 1, "pct": ".500" }
+            }
+          },
+          "venue": { "name": "Minute Maid Park" }
+        }
+      ]
+    },
+    {
+      "games": [
+        {
+          "gamePk": 1003,
+          "gameDate": "2026-04-03T22:10:00Z",
+          "status": { "abstractGameState": "Final" },
+          "teams": {
+            "away": {
+              "score": 4,
+              "team": { "id": 143, "name": "Philadelphia Phillies" },
+              "leagueRecord": { "wins": 3, "losses": 2, "pct": ".600" }
+            },
+            "home": {
+              "score": 6,
+              "team": { "id": 115, "name": "Colorado Rockies" },
+              "leagueRecord": { "wins": 2, "losses": 1, "pct": ".667" }
+            }
+          },
+          "venue": { "name": "Coors Field" }
+        }
+      ]
+    }
+  ]
+}
