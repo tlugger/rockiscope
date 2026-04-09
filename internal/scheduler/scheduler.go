@@ -229,3 +229,105 @@ func (s *Scheduler) nextCheckTime() time.Time {
 func (s *Scheduler) Tick() error {
 	return s.tick()
 }
+
+// RunOnce gathers data and posts immediately, ignoring schedule timing
+// and dedup checks. Used by the CLI "post" command.
+func (s *Scheduler) RunOnce() error {
+	game, err := s.mlb.GetTodayGame()
+	if err != nil {
+		return fmt.Errorf("fetching today's game: %w", err)
+	}
+
+	if game != nil {
+		return s.handleGameDayImmediate(game)
+	}
+	return s.handleOffDayImmediate()
+}
+
+func (s *Scheduler) handleGameDayImmediate(game *mlb.Game) error {
+	s.logger.Println("gathering game data...")
+
+	record, err := s.mlb.GetTeamRecord()
+	if err != nil {
+		s.logger.Printf("warning: could not get team record: %v", err)
+	}
+
+	var h2h *mlb.H2HRecord
+	h2h, err = s.mlb.GetHeadToHead(game.OpponentID())
+	if err != nil {
+		s.logger.Printf("warning: could not get H2H: %v", err)
+	}
+
+	var pitcherStats *mlb.PitcherStats
+	if rp := game.RockiesPitcher(); rp != nil {
+		pitcherStats, err = s.mlb.GetPitcherStats(rp.ID)
+		if err != nil {
+			s.logger.Printf("warning: could not get pitcher stats: %v", err)
+		}
+	}
+
+	horo, err := s.horoscope.GetDailyHoroscope()
+	if err != nil {
+		s.logger.Printf("warning: could not get horoscope: %v", err)
+	}
+
+	horoText := ""
+	if horo != nil {
+		horoText = horo.Text
+	}
+
+	pred := prediction.Predict(prediction.Input{
+		Record:          record,
+		RockiesPitcher:  pitcherStats,
+		OpponentPitcher: s.getOpponentPitcher(game),
+		HeadToHead:      h2h,
+		IsHome:          game.IsHome,
+		HoroscopeText:   horoText,
+	})
+
+	postText := formatter.FormatGameDay(formatter.GameDayPost{
+		Game:       game,
+		Record:     record,
+		H2H:        h2h,
+		Pitcher:    pitcherStats,
+		Horoscope:  horo,
+		Prediction: pred,
+	})
+
+	s.logger.Printf("posting:\n%s", postText)
+
+	if err := s.poster.Post(postText); err != nil {
+		return fmt.Errorf("posting: %w", err)
+	}
+
+	s.logger.Println("posted successfully!")
+	return nil
+}
+
+func (s *Scheduler) handleOffDayImmediate() error {
+	s.logger.Println("off day — posting horoscope + stats")
+
+	record, err := s.mlb.GetTeamRecord()
+	if err != nil {
+		s.logger.Printf("warning: could not get team record: %v", err)
+	}
+
+	horo, err := s.horoscope.GetDailyHoroscope()
+	if err != nil {
+		s.logger.Printf("warning: could not get horoscope: %v", err)
+	}
+
+	postText := formatter.FormatOffDay(formatter.OffDayPost{
+		Record:    record,
+		Horoscope: horo,
+	})
+
+	s.logger.Printf("posting:\n%s", postText)
+
+	if err := s.poster.Post(postText); err != nil {
+		return fmt.Errorf("posting: %w", err)
+	}
+
+	s.logger.Println("posted successfully!")
+	return nil
+}
