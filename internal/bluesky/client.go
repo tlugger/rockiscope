@@ -128,7 +128,12 @@ func (c *Client) createRecord(url, text string, parent *PostRef) (*PostRef, erro
 	defer resp.Body.Close()
 
 	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("Bluesky post returned status %d", resp.StatusCode)
+		var errBody struct {
+			Error   string `json:"error"`
+			Message string `json:"message"`
+		}
+		json.NewDecoder(resp.Body).Decode(&errBody)
+		return nil, fmt.Errorf("Bluesky post returned status %d: %s: %s", resp.StatusCode, errBody.Error, errBody.Message)
 	}
 
 	var result struct {

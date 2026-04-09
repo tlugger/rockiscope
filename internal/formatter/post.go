@@ -9,6 +9,8 @@ import (
 	"github.com/tlugger/rockiscope/internal/prediction"
 )
 
+const maxBlueskyChars = 300
+
 // ThreadPost holds the main post and an optional reply for threading.
 type ThreadPost struct {
 	Main  string
@@ -72,7 +74,7 @@ func FormatGameDay(p GameDayPost) ThreadPost {
 
 	// Horoscope as reply
 	if p.Horoscope != nil {
-		thread.Reply = fmt.Sprintf("♋ Today's Cancer horoscope:\n\n%s", p.Horoscope.Text)
+		thread.Reply = formatHoroscopeReply(p.Horoscope.Text)
 	}
 
 	return thread
@@ -100,10 +102,23 @@ func FormatOffDay(p OffDayPost) ThreadPost {
 	thread := ThreadPost{Main: strings.TrimSpace(b.String())}
 
 	if p.Horoscope != nil {
-		thread.Reply = fmt.Sprintf("♋ Today's Cancer horoscope:\n\n%s", p.Horoscope.Text)
+		thread.Reply = formatHoroscopeReply(p.Horoscope.Text)
 	}
 
 	return thread
+}
+
+func formatHoroscopeReply(text string) string {
+	prefix := "♋ Today's Cancer horoscope:\n\n"
+	maxText := maxBlueskyChars - len(prefix)
+	if len(text) > maxText {
+		truncated := text[:maxText-3]
+		if idx := strings.LastIndex(truncated, " "); idx > 0 {
+			truncated = truncated[:idx]
+		}
+		text = truncated + "..."
+	}
+	return prefix + text
 }
 
 func shortName(name string) string {

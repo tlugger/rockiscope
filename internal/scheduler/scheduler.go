@@ -206,6 +206,7 @@ func (s *Scheduler) postThread(thread formatter.ThreadPost) error {
 	s.logger.Println("posted successfully!")
 
 	if thread.Reply != "" && ref != nil {
+		s.sleep(2 * time.Second) // brief pause before replying
 		s.logger.Printf("replying with horoscope:\n%s", thread.Reply)
 		if _, err := s.poster.Reply(thread.Reply, *ref); err != nil {
 			s.logger.Printf("warning: could not post horoscope reply: %v", err)

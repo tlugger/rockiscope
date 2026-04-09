@@ -197,7 +197,8 @@ func TestTick_WaitsForGameTime(t *testing.T) {
 	gameTime := time.Date(2026, 4, 8, 23, 0, 0, 0, time.UTC)
 	nowTime := time.Date(2026, 4, 8, 15, 0, 0, 0, time.UTC)
 
-	var sleptDuration time.Duration
+	var firstSleep time.Duration
+	sleepCount := 0
 	poster := &mockPoster{}
 	s := &Scheduler{
 		mlb: &mockMLB{
@@ -217,7 +218,10 @@ func TestTick_WaitsForGameTime(t *testing.T) {
 		poster: poster,
 		now:    func() time.Time { return nowTime },
 		sleep: func(d time.Duration) {
-			sleptDuration = d
+			sleepCount++
+			if sleepCount == 1 {
+				firstSleep = d
+			}
 			nowTime = nowTime.Add(d)
 		},
 		logger: testLogger(),
@@ -229,8 +233,8 @@ func TestTick_WaitsForGameTime(t *testing.T) {
 	}
 
 	expectedSleep := gameTime.Add(-1 * time.Hour).Sub(time.Date(2026, 4, 8, 15, 0, 0, 0, time.UTC))
-	if sleptDuration != expectedSleep {
-		t.Errorf("slept %s, expected %s", sleptDuration, expectedSleep)
+	if firstSleep != expectedSleep {
+		t.Errorf("first sleep = %s, expected %s", firstSleep, expectedSleep)
 	}
 
 	if len(poster.posts) != 1 {
