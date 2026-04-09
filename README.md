@@ -76,24 +76,38 @@ ssh pi@yourpi 'sudo systemctl restart rockiscope'
 
 ## ✨ Sample Posts
 
+Posts are threaded — game info first, full horoscope as a reply.
+
 **Game Day** (1 hour before first pitch):
 ```
-Rockies vs Houston Astros
-1:10 PM MDT at Coors Field
-SP: Michael Lorenzen (9.00 ERA, 0-1)
-Season: 5-6 | vs HOU: 2-1 | W2
+⚾ Rockies vs Houston Astros
+🕐 1:10 PM MDT at Coors Field
+🪖 Michael Lorenzen (9.00 ERA, 0-1)
+📊 5-6 | vs HOU: 2-1 | W2
 
-Prediction: A slight celestial nudge toward a Rockies defeat (55%)
+🔮 A slight celestial nudge toward a Rockies defeat (55%)
+```
+↳ reply:
+```
+♋ Today's Cancer horoscope:
 
-Cancer, the energy around you is intense today...
+Cancer, the energy around you is intense today. You may
+feel pulled in multiple directions. Take a deep breath and
+remember that the stars are aligned in your favor, even if
+it doesn't feel like it right now.
 ```
 
 **Off Day** (10 AM MST):
 ```
-No Rockies game today.
-Season: 5-6 (.455) | Run Diff: -3 | L1
+⚾ No Rockies game today.
+📊 5-6 (.455) | Run Diff: -3 | L1
+```
+↳ reply:
+```
+♋ Today's Cancer horoscope:
 
-Rest and reflection bring clarity today...
+Rest and reflection bring clarity today. The cosmos suggest
+patience and self-care during this quiet moment.
 ```
 
 ---

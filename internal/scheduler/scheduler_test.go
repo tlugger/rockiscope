@@ -1,17 +1,17 @@
 package scheduler
 
 import (
+	"fmt"
 	"log"
 	"os"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/tlugger/rockiscope/internal/bluesky"
 	"github.com/tlugger/rockiscope/internal/horoscope"
 	"github.com/tlugger/rockiscope/internal/mlb"
 )
-
-// Mock implementations
 
 type mockMLB struct {
 	game    *mlb.Game
@@ -20,10 +20,10 @@ type mockMLB struct {
 	h2h     *mlb.H2HRecord
 }
 
-func (m *mockMLB) GetTodayGame() (*mlb.Game, error)                { return m.game, nil }
-func (m *mockMLB) GetTeamRecord() (*mlb.TeamRecord, error)         { return m.record, nil }
+func (m *mockMLB) GetTodayGame() (*mlb.Game, error)                  { return m.game, nil }
+func (m *mockMLB) GetTeamRecord() (*mlb.TeamRecord, error)           { return m.record, nil }
 func (m *mockMLB) GetPitcherStats(id int) (*mlb.PitcherStats, error) { return m.pitcher, nil }
-func (m *mockMLB) GetHeadToHead(id int) (*mlb.H2HRecord, error)    { return m.h2h, nil }
+func (m *mockMLB) GetHeadToHead(id int) (*mlb.H2HRecord, error)     { return m.h2h, nil }
 
 type mockHoroscope struct {
 	horo *horoscope.Horoscope
@@ -34,12 +34,27 @@ func (m *mockHoroscope) GetDailyHoroscope() (*horoscope.Horoscope, error) {
 }
 
 type mockPoster struct {
-	posts []string
+	posts   []string
+	replies []string
+	seq     int
 }
 
-func (m *mockPoster) Post(text string) error {
+func (m *mockPoster) Post(text string) (*bluesky.PostRef, error) {
+	m.seq++
 	m.posts = append(m.posts, text)
-	return nil
+	return &bluesky.PostRef{
+		URI: fmt.Sprintf("at://mock/post/%d", m.seq),
+		CID: fmt.Sprintf("mock-cid-%d", m.seq),
+	}, nil
+}
+
+func (m *mockPoster) Reply(text string, parent bluesky.PostRef) (*bluesky.PostRef, error) {
+	m.seq++
+	m.replies = append(m.replies, text)
+	return &bluesky.PostRef{
+		URI: fmt.Sprintf("at://mock/post/%d", m.seq),
+		CID: fmt.Sprintf("mock-cid-%d", m.seq),
+	}, nil
 }
 
 func testLogger() *log.Logger {
@@ -49,7 +64,7 @@ func testLogger() *log.Logger {
 func TestTick_GameDay(t *testing.T) {
 	denver := mlb.DenverLocation()
 	gameTime := time.Date(2026, 4, 8, 19, 10, 0, 0, time.UTC)
-	nowTime := gameTime.Add(-30 * time.Minute) // 30 min before game, past post time
+	nowTime := gameTime.Add(-30 * time.Minute)
 
 	poster := &mockPoster{}
 	s := &Scheduler{
@@ -78,7 +93,7 @@ func TestTick_GameDay(t *testing.T) {
 		},
 		poster: poster,
 		now:    func() time.Time { return nowTime },
-		sleep:  func(d time.Duration) {}, // no-op for tests
+		sleep:  func(d time.Duration) {},
 		logger: testLogger(),
 	}
 
@@ -92,14 +107,24 @@ func TestTick_GameDay(t *testing.T) {
 	}
 
 	post := poster.posts[0]
-	if !strings.Contains(post, "Rockies vs Houston Astros") {
+	if !strings.Contains(post, "⚾ Rockies vs Houston Astros") {
 		t.Errorf("missing matchup in post:\n%s", post)
 	}
-	if !strings.Contains(post, "Prediction:") {
+	if !strings.Contains(post, "🔮") {
 		t.Errorf("missing prediction in post:\n%s", post)
 	}
 
-	// Should mark as posted
+	// Should have a horoscope reply
+	if len(poster.replies) != 1 {
+		t.Fatalf("expected 1 reply, got %d", len(poster.replies))
+	}
+	if !strings.Contains(poster.replies[0], "♋") {
+		t.Errorf("missing cancer emoji in reply:\n%s", poster.replies[0])
+	}
+	if !strings.Contains(poster.replies[0], "bold moves") {
+		t.Errorf("missing horoscope text in reply:\n%s", poster.replies[0])
+	}
+
 	today := nowTime.In(denver).Format("2006-01-02")
 	if s.lastPostDate != today {
 		t.Errorf("lastPostDate = %q, want %q", s.lastPostDate, today)
@@ -108,12 +133,12 @@ func TestTick_GameDay(t *testing.T) {
 
 func TestTick_OffDay(t *testing.T) {
 	denver := mlb.DenverLocation()
-	nowTime := time.Date(2026, 4, 10, 11, 0, 0, 0, denver) // past 10 AM
+	nowTime := time.Date(2026, 4, 10, 11, 0, 0, 0, denver)
 
 	poster := &mockPoster{}
 	s := &Scheduler{
 		mlb: &mockMLB{
-			game:   nil, // off-day
+			game:   nil,
 			record: &mlb.TeamRecord{Wins: 5, Losses: 6, WinningPercentage: 0.455, RunDifferential: -3},
 		},
 		horoscope: &mockHoroscope{
@@ -134,9 +159,12 @@ func TestTick_OffDay(t *testing.T) {
 		t.Fatalf("expected 1 post, got %d", len(poster.posts))
 	}
 
-	post := poster.posts[0]
-	if !strings.Contains(post, "No Rockies game today") {
-		t.Errorf("missing off-day message:\n%s", post)
+	if !strings.Contains(poster.posts[0], "⚾ No Rockies game today") {
+		t.Errorf("missing off-day message:\n%s", poster.posts[0])
+	}
+
+	if len(poster.replies) != 1 {
+		t.Fatalf("expected 1 horoscope reply, got %d", len(poster.replies))
 	}
 }
 
@@ -152,7 +180,7 @@ func TestTick_AlreadyPosted(t *testing.T) {
 		now:          func() time.Time { return nowTime },
 		sleep:        func(d time.Duration) {},
 		logger:       testLogger(),
-		lastPostDate: "2026-04-08", // already posted today
+		lastPostDate: "2026-04-08",
 	}
 
 	err := s.Tick()
@@ -166,8 +194,8 @@ func TestTick_AlreadyPosted(t *testing.T) {
 }
 
 func TestTick_WaitsForGameTime(t *testing.T) {
-	gameTime := time.Date(2026, 4, 8, 23, 0, 0, 0, time.UTC) // late game
-	nowTime := time.Date(2026, 4, 8, 15, 0, 0, 0, time.UTC)  // way before post time
+	gameTime := time.Date(2026, 4, 8, 23, 0, 0, 0, time.UTC)
+	nowTime := time.Date(2026, 4, 8, 15, 0, 0, 0, time.UTC)
 
 	var sleptDuration time.Duration
 	poster := &mockPoster{}
@@ -190,7 +218,6 @@ func TestTick_WaitsForGameTime(t *testing.T) {
 		now:    func() time.Time { return nowTime },
 		sleep: func(d time.Duration) {
 			sleptDuration = d
-			// After sleeping, advance "now" past post time
 			nowTime = nowTime.Add(d)
 		},
 		logger: testLogger(),
@@ -201,7 +228,6 @@ func TestTick_WaitsForGameTime(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Should have slept ~7 hours (23:00 - 1hr = 22:00, minus 15:00 = 7hr)
 	expectedSleep := gameTime.Add(-1 * time.Hour).Sub(time.Date(2026, 4, 8, 15, 0, 0, 0, time.UTC))
 	if sleptDuration != expectedSleep {
 		t.Errorf("slept %s, expected %s", sleptDuration, expectedSleep)
@@ -224,5 +250,43 @@ func TestNextCheckTime(t *testing.T) {
 	expected := time.Date(2026, 4, 9, 5, 0, 0, 0, denver)
 	if !next.Equal(expected) {
 		t.Errorf("nextCheckTime = %v, want %v", next, expected)
+	}
+}
+
+func TestTick_GameDay_NoHoroscope(t *testing.T) {
+	gameTime := time.Date(2026, 4, 8, 19, 10, 0, 0, time.UTC)
+	nowTime := gameTime.Add(-30 * time.Minute)
+
+	poster := &mockPoster{}
+	s := &Scheduler{
+		mlb: &mockMLB{
+			game: &mlb.Game{
+				GameDateTime: gameTime,
+				Status:       "Preview",
+				Venue:        "Coors Field",
+				IsHome:       true,
+				HomeTeam:     mlb.TeamInfo{ID: 115, Name: "Colorado Rockies"},
+				AwayTeam:     mlb.TeamInfo{ID: 117, Name: "Houston Astros"},
+			},
+			record: &mlb.TeamRecord{Wins: 5, Losses: 6, WinningPercentage: 0.455},
+		},
+		horoscope: &mockHoroscope{horo: nil},
+		poster:    poster,
+		now:       func() time.Time { return nowTime },
+		sleep:     func(d time.Duration) {},
+		logger:    testLogger(),
+	}
+
+	err := s.Tick()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(poster.posts) != 1 {
+		t.Fatalf("expected 1 post, got %d", len(poster.posts))
+	}
+	// No horoscope = no reply
+	if len(poster.replies) != 0 {
+		t.Errorf("expected 0 replies without horoscope, got %d", len(poster.replies))
 	}
 }

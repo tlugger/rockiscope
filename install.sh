@@ -27,10 +27,21 @@ fail() { echo "  ❌ $1"; exit 1; }
 
 # ── Banner ───────────────────────────────────────────────────────────
 
+IS_UPDATE=0
+if [ -f "$INSTALL_DIR/rockiscope" ]; then
+  IS_UPDATE=1
+fi
+
 echo ""
-echo "  ⚾ Rockiscope Installer"
-echo "  ───────────────────────"
-echo "  Horoscopes & predictions for the Colorado Rockies"
+if [ "$IS_UPDATE" = "1" ]; then
+  echo "  ⚾ Rockiscope Updater"
+  echo "  ─────────────────────"
+  echo "  Updating existing installation"
+else
+  echo "  ⚾ Rockiscope Installer"
+  echo "  ───────────────────────"
+  echo "  Horoscopes & predictions for the Colorado Rockies"
+fi
 echo ""
 
 # ── Architecture ─────────────────────────────────────────────────────
@@ -52,6 +63,12 @@ mkdir -p "$INSTALL_DIR"
 ok "Install directory: $INSTALL_DIR"
 
 # ── Get the binary ───────────────────────────────────────────────────
+
+# Stop running service before replacing binary
+if systemctl is-active "$SERVICE_NAME" &>/dev/null; then
+  systemctl stop "$SERVICE_NAME"
+  ok "Stopped running service"
+fi
 
 step "Getting rockiscope binary"
 

@@ -9,7 +9,11 @@ import (
 	"github.com/tlugger/rockiscope/internal/prediction"
 )
 
-const maxBlueskyChars = 300
+// ThreadPost holds the main post and an optional reply for threading.
+type ThreadPost struct {
+	Main  string
+	Reply string // empty if no horoscope available
+}
 
 // GameDayPost builds the post text for a game day.
 type GameDayPost struct {
@@ -27,29 +31,29 @@ type OffDayPost struct {
 	Horoscope *horoscope.Horoscope
 }
 
-// FormatGameDay produces the game day post text, fitting within Bluesky's limit.
-func FormatGameDay(p GameDayPost) string {
+// FormatGameDay produces the game day thread.
+func FormatGameDay(p GameDayPost) ThreadPost {
 	var b strings.Builder
 
-	// Line 1: Matchup
+	// Matchup
 	opponent := p.Game.Opponent().Name
 	location := "vs"
 	if !p.Game.IsHome {
 		location = "@"
 	}
-	fmt.Fprintf(&b, "%s %s %s\n", "Rockies", location, opponent)
+	fmt.Fprintf(&b, "⚾ Rockies %s %s\n", location, opponent)
 
-	// Line 2: Game info
-	fmt.Fprintf(&b, "%s at %s\n", p.Game.FormatGameTime(), p.Game.Venue)
+	// Game info
+	fmt.Fprintf(&b, "🕐 %s at %s\n", p.Game.FormatGameTime(), p.Game.Venue)
 
-	// Line 3: Pitcher (if available)
+	// Pitcher
 	if p.Pitcher != nil && p.Pitcher.GamesStarted > 0 {
-		fmt.Fprintf(&b, "SP: %s (%.2f ERA, %d-%d)\n", p.Pitcher.FullName, p.Pitcher.ERA, p.Pitcher.Wins, p.Pitcher.Losses)
+		fmt.Fprintf(&b, "🪖 %s (%.2f ERA, %d-%d)\n", p.Pitcher.FullName, p.Pitcher.ERA, p.Pitcher.Wins, p.Pitcher.Losses)
 	}
 
-	// Line 4: Record + H2H
+	// Record + H2H
 	if p.Record != nil {
-		fmt.Fprintf(&b, "Season: %d-%d", p.Record.Wins, p.Record.Losses)
+		fmt.Fprintf(&b, "📊 %d-%d", p.Record.Wins, p.Record.Losses)
 		if p.H2H != nil && p.H2H.GamesPlayed > 0 {
 			fmt.Fprintf(&b, " | vs %s: %d-%d", shortName(p.H2H.OpponentName), p.H2H.Wins, p.H2H.Losses)
 		}
@@ -61,31 +65,27 @@ func FormatGameDay(p GameDayPost) string {
 
 	b.WriteString("\n")
 
-	// Prediction line
-	fmt.Fprintf(&b, "Prediction: %s\n", p.Prediction.FormatPrediction())
+	// Prediction
+	fmt.Fprintf(&b, "🔮 %s", p.Prediction.FormatPrediction())
 
-	b.WriteString("\n")
+	thread := ThreadPost{Main: strings.TrimSpace(b.String())}
 
-	// Horoscope — fill remaining space
+	// Horoscope as reply
 	if p.Horoscope != nil {
-		remaining := maxBlueskyChars - b.Len() - 2 // leave room for newline
-		if remaining > 30 {
-			horoText := horoscope.Truncate(p.Horoscope.Text, remaining)
-			fmt.Fprintf(&b, "%s", horoText)
-		}
+		thread.Reply = fmt.Sprintf("♋ Today's Cancer horoscope:\n\n%s", p.Horoscope.Text)
 	}
 
-	return strings.TrimSpace(b.String())
+	return thread
 }
 
-// FormatOffDay produces the off day post text.
-func FormatOffDay(p OffDayPost) string {
+// FormatOffDay produces the off day thread.
+func FormatOffDay(p OffDayPost) ThreadPost {
 	var b strings.Builder
 
-	b.WriteString("No Rockies game today.\n")
+	b.WriteString("⚾ No Rockies game today.\n")
 
 	if p.Record != nil {
-		fmt.Fprintf(&b, "Season: %d-%d (%.3f)", p.Record.Wins, p.Record.Losses, p.Record.WinningPercentage)
+		fmt.Fprintf(&b, "📊 %d-%d (%.3f)", p.Record.Wins, p.Record.Losses, p.Record.WinningPercentage)
 		if p.Record.RunDifferential >= 0 {
 			fmt.Fprintf(&b, " | Run Diff: +%d", p.Record.RunDifferential)
 		} else {
@@ -97,22 +97,15 @@ func FormatOffDay(p OffDayPost) string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\n")
+	thread := ThreadPost{Main: strings.TrimSpace(b.String())}
 
-	// Horoscope fills remaining space
 	if p.Horoscope != nil {
-		remaining := maxBlueskyChars - b.Len() - 2
-		if remaining > 30 {
-			horoText := horoscope.Truncate(p.Horoscope.Text, remaining)
-			fmt.Fprintf(&b, "%s", horoText)
-		}
+		thread.Reply = fmt.Sprintf("♋ Today's Cancer horoscope:\n\n%s", p.Horoscope.Text)
 	}
 
-	return strings.TrimSpace(b.String())
+	return thread
 }
 
-// shortName trims a team name to its city/nickname for brevity.
-// "Houston Astros" -> "HOU", "Colorado Rockies" -> "COL"
 func shortName(name string) string {
 	abbrevs := map[string]string{
 		"Arizona Diamondbacks":  "ARI", "Atlanta Braves": "ATL",
@@ -134,7 +127,6 @@ func shortName(name string) string {
 	if abbr, ok := abbrevs[name]; ok {
 		return abbr
 	}
-	// Fallback: use first 3 chars
 	if len(name) >= 3 {
 		return strings.ToUpper(name[:3])
 	}

@@ -79,9 +79,15 @@ func cmdPost(logger *log.Logger) {
 }
 
 func cmdPreview(logger *log.Logger) {
+	n := 0
 	poster := &bluesky.DryRunPoster{
 		OnPost: func(text string) {
-			fmt.Println("─── Preview ───")
+			n++
+			if n == 1 {
+				fmt.Println("─── Post ───")
+			} else {
+				fmt.Println("─── Reply ───")
+			}
 			fmt.Println(text)
 			fmt.Printf("─── %d chars ───\n", len(text))
 		},

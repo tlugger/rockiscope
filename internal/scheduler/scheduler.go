@@ -12,7 +12,6 @@ import (
 	"github.com/tlugger/rockiscope/internal/prediction"
 )
 
-// Scheduler manages the daily posting loop.
 type Scheduler struct {
 	mlb       mlb.GameProvider
 	horoscope horoscope.Provider
@@ -21,10 +20,9 @@ type Scheduler struct {
 	sleep     func(time.Duration)
 	logger    *log.Logger
 
-	lastPostDate string // "2006-01-02" of last post to avoid duplicates
+	lastPostDate string
 }
 
-// Config holds the scheduler's injectable dependencies.
 type Config struct {
 	MLB       mlb.GameProvider
 	Horoscope horoscope.Provider
@@ -43,7 +41,6 @@ func New(cfg Config) *Scheduler {
 	}
 }
 
-// Run starts the main scheduling loop. Blocks forever.
 func (s *Scheduler) Run() {
 	s.logger.Println("rockiscope scheduler started")
 
@@ -53,7 +50,6 @@ func (s *Scheduler) Run() {
 			s.logger.Printf("error: %v", err)
 		}
 
-		// Sleep until next check — 5 AM Denver time tomorrow
 		nextCheck := s.nextCheckTime()
 		sleepDur := nextCheck.Sub(s.now())
 		if sleepDur < 1*time.Minute {
@@ -64,8 +60,6 @@ func (s *Scheduler) Run() {
 	}
 }
 
-// tick runs one iteration of the scheduling logic.
-// Returns an error if something goes wrong, but is not fatal.
 func (s *Scheduler) tick() error {
 	denver := mlb.DenverLocation()
 	today := s.now().In(denver).Format("2006-01-02")
@@ -89,7 +83,6 @@ func (s *Scheduler) tick() error {
 func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
 	denver := mlb.DenverLocation()
 
-	// Wait until 1 hour before game time
 	postTime := game.GameDateTime.Add(-1 * time.Hour)
 	now := s.now()
 
@@ -102,9 +95,42 @@ func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
 		s.sleep(waitDur)
 	}
 
+	thread := s.buildGameDayThread(game)
+
+	if err := s.postThread(thread); err != nil {
+		return err
+	}
+
+	s.lastPostDate = today
+	return nil
+}
+
+func (s *Scheduler) handleOffDay(today string) error {
+	s.logger.Println("off day — posting horoscope + stats")
+
+	denver := mlb.DenverLocation()
+	offDayPostTime := time.Date(s.now().Year(), s.now().Month(), s.now().Day(), 10, 0, 0, 0, denver)
+	now := s.now()
+
+	if now.Before(offDayPostTime) {
+		waitDur := offDayPostTime.Sub(now)
+		s.logger.Printf("off day post at 10:00 AM MST (in %s)", waitDur.Round(time.Minute))
+		s.sleep(waitDur)
+	}
+
+	thread := s.buildOffDayThread()
+
+	if err := s.postThread(thread); err != nil {
+		return err
+	}
+
+	s.lastPostDate = today
+	return nil
+}
+
+func (s *Scheduler) buildGameDayThread(game *mlb.Game) formatter.ThreadPost {
 	s.logger.Println("gathering game data...")
 
-	// Gather all data — tolerate individual failures
 	record, err := s.mlb.GetTeamRecord()
 	if err != nil {
 		s.logger.Printf("warning: could not get team record: %v", err)
@@ -134,7 +160,6 @@ func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
 		horoText = horo.Text
 	}
 
-	// Run prediction
 	pred := prediction.Predict(prediction.Input{
 		Record:          record,
 		RockiesPitcher:  pitcherStats,
@@ -144,8 +169,7 @@ func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
 		HoroscopeText:   horoText,
 	})
 
-	// Format post
-	postText := formatter.FormatGameDay(formatter.GameDayPost{
+	return formatter.FormatGameDay(formatter.GameDayPost{
 		Game:       game,
 		Record:     record,
 		H2H:        h2h,
@@ -153,32 +177,9 @@ func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
 		Horoscope:  horo,
 		Prediction: pred,
 	})
-
-	s.logger.Printf("posting game day update:\n%s", postText)
-
-	if err := s.poster.Post(postText); err != nil {
-		return fmt.Errorf("posting to Bluesky: %w", err)
-	}
-
-	s.lastPostDate = today
-	s.logger.Println("posted successfully!")
-	return nil
 }
 
-func (s *Scheduler) handleOffDay(today string) error {
-	s.logger.Println("off day — posting horoscope + stats")
-
-	// Wait until 10 AM Denver time
-	denver := mlb.DenverLocation()
-	offDayPostTime := time.Date(s.now().Year(), s.now().Month(), s.now().Day(), 10, 0, 0, 0, denver)
-	now := s.now()
-
-	if now.Before(offDayPostTime) {
-		waitDur := offDayPostTime.Sub(now)
-		s.logger.Printf("off day post at 10:00 AM MST (in %s)", waitDur.Round(time.Minute))
-		s.sleep(waitDur)
-	}
-
+func (s *Scheduler) buildOffDayThread() formatter.ThreadPost {
 	record, err := s.mlb.GetTeamRecord()
 	if err != nil {
 		s.logger.Printf("warning: could not get team record: %v", err)
@@ -189,19 +190,30 @@ func (s *Scheduler) handleOffDay(today string) error {
 		s.logger.Printf("warning: could not get horoscope: %v", err)
 	}
 
-	postText := formatter.FormatOffDay(formatter.OffDayPost{
+	return formatter.FormatOffDay(formatter.OffDayPost{
 		Record:    record,
 		Horoscope: horo,
 	})
+}
 
-	s.logger.Printf("posting off day update:\n%s", postText)
+func (s *Scheduler) postThread(thread formatter.ThreadPost) error {
+	s.logger.Printf("posting:\n%s", thread.Main)
 
-	if err := s.poster.Post(postText); err != nil {
+	ref, err := s.poster.Post(thread.Main)
+	if err != nil {
 		return fmt.Errorf("posting to Bluesky: %w", err)
 	}
-
-	s.lastPostDate = today
 	s.logger.Println("posted successfully!")
+
+	if thread.Reply != "" && ref != nil {
+		s.logger.Printf("replying with horoscope:\n%s", thread.Reply)
+		if _, err := s.poster.Reply(thread.Reply, *ref); err != nil {
+			s.logger.Printf("warning: could not post horoscope reply: %v", err)
+		} else {
+			s.logger.Println("horoscope reply posted!")
+		}
+	}
+
 	return nil
 }
 
@@ -225,109 +237,23 @@ func (s *Scheduler) nextCheckTime() time.Time {
 	return time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 5, 0, 0, 0, denver)
 }
 
-// Tick exposes the tick method for testing.
 func (s *Scheduler) Tick() error {
 	return s.tick()
 }
 
-// RunOnce gathers data and posts immediately, ignoring schedule timing
-// and dedup checks. Used by the CLI "post" command.
 func (s *Scheduler) RunOnce() error {
 	game, err := s.mlb.GetTodayGame()
 	if err != nil {
 		return fmt.Errorf("fetching today's game: %w", err)
 	}
 
+	var thread formatter.ThreadPost
 	if game != nil {
-		return s.handleGameDayImmediate(game)
-	}
-	return s.handleOffDayImmediate()
-}
-
-func (s *Scheduler) handleGameDayImmediate(game *mlb.Game) error {
-	s.logger.Println("gathering game data...")
-
-	record, err := s.mlb.GetTeamRecord()
-	if err != nil {
-		s.logger.Printf("warning: could not get team record: %v", err)
+		thread = s.buildGameDayThread(game)
+	} else {
+		s.logger.Println("off day — posting horoscope + stats")
+		thread = s.buildOffDayThread()
 	}
 
-	var h2h *mlb.H2HRecord
-	h2h, err = s.mlb.GetHeadToHead(game.OpponentID())
-	if err != nil {
-		s.logger.Printf("warning: could not get H2H: %v", err)
-	}
-
-	var pitcherStats *mlb.PitcherStats
-	if rp := game.RockiesPitcher(); rp != nil {
-		pitcherStats, err = s.mlb.GetPitcherStats(rp.ID)
-		if err != nil {
-			s.logger.Printf("warning: could not get pitcher stats: %v", err)
-		}
-	}
-
-	horo, err := s.horoscope.GetDailyHoroscope()
-	if err != nil {
-		s.logger.Printf("warning: could not get horoscope: %v", err)
-	}
-
-	horoText := ""
-	if horo != nil {
-		horoText = horo.Text
-	}
-
-	pred := prediction.Predict(prediction.Input{
-		Record:          record,
-		RockiesPitcher:  pitcherStats,
-		OpponentPitcher: s.getOpponentPitcher(game),
-		HeadToHead:      h2h,
-		IsHome:          game.IsHome,
-		HoroscopeText:   horoText,
-	})
-
-	postText := formatter.FormatGameDay(formatter.GameDayPost{
-		Game:       game,
-		Record:     record,
-		H2H:        h2h,
-		Pitcher:    pitcherStats,
-		Horoscope:  horo,
-		Prediction: pred,
-	})
-
-	s.logger.Printf("posting:\n%s", postText)
-
-	if err := s.poster.Post(postText); err != nil {
-		return fmt.Errorf("posting: %w", err)
-	}
-
-	s.logger.Println("posted successfully!")
-	return nil
-}
-
-func (s *Scheduler) handleOffDayImmediate() error {
-	s.logger.Println("off day — posting horoscope + stats")
-
-	record, err := s.mlb.GetTeamRecord()
-	if err != nil {
-		s.logger.Printf("warning: could not get team record: %v", err)
-	}
-
-	horo, err := s.horoscope.GetDailyHoroscope()
-	if err != nil {
-		s.logger.Printf("warning: could not get horoscope: %v", err)
-	}
-
-	postText := formatter.FormatOffDay(formatter.OffDayPost{
-		Record:    record,
-		Horoscope: horo,
-	})
-
-	s.logger.Printf("posting:\n%s", postText)
-
-	if err := s.poster.Post(postText); err != nil {
-		return fmt.Errorf("posting: %w", err)
-	}
-
-	s.logger.Println("posted successfully!")
-	return nil
+	return s.postThread(thread)
 }
