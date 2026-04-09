@@ -113,7 +113,7 @@ step "Bluesky configuration"
 
 if [ -f "$INSTALL_DIR/.env" ]; then
   echo "  📄 Existing .env found"
-  read -rp "  Overwrite credentials? [y/N] " overwrite
+  read -rp "  Overwrite credentials? [y/N] " overwrite </dev/tty
   if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
     ok "Keeping existing credentials"
     SKIP_CREDS=1
@@ -124,8 +124,8 @@ if [ "${SKIP_CREDS:-}" != "1" ]; then
   echo "  🔑 You need a Bluesky app password"
   echo "     Create one at: https://bsky.app/settings/app-passwords"
   echo ""
-  read -rp "  Bluesky username (e.g. yourname.bsky.social): " BS_USER
-  read -rsp "  Bluesky app password: " BS_PASS
+  read -rp "  Bluesky username (e.g. yourname.bsky.social): " BS_USER </dev/tty
+  read -rsp "  Bluesky app password: " BS_PASS </dev/tty
   echo ""
 
   if [ -z "$BS_USER" ] || [ -z "$BS_PASS" ]; then
