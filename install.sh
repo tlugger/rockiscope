@@ -4,70 +4,150 @@ set -euo pipefail
 INSTALL_DIR="/home/pi/rockiscope"
 REPO="tlugger/rockiscope"
 SERVICE_NAME="rockiscope"
+GO_MIN_VERSION="1.21"
 
-echo "=== Rockiscope Installer ==="
+# ── Helpers ──────────────────────────────────────────────────────────
+
+spin() {
+  local pid=$1 msg=$2
+  local frames=("⠋" "⠙" "⠹" "⠸" "⠼" "⠴" "⠦" "⠧" "⠇" "⠏")
+  local i=0
+  while kill -0 "$pid" 2>/dev/null; do
+    printf "\r  %s %s" "${frames[$((i % 10))]}" "$msg"
+    i=$((i + 1))
+    sleep 0.1
+  done
+  wait "$pid" && printf "\r  ✅ %s\n" "$msg" || { printf "\r  ❌ %s\n" "$msg"; return 1; }
+}
+
+step() { echo ""; echo "── $1 ──"; }
+ok()   { echo "  ✅ $1"; }
+warn() { echo "  ⚠️  $1"; }
+fail() { echo "  ❌ $1"; exit 1; }
+
+# ── Banner ───────────────────────────────────────────────────────────
+
+echo ""
+echo "  ⚾ Rockiscope Installer"
+echo "  ───────────────────────"
+echo "  Horoscopes & predictions for the Colorado Rockies"
 echo ""
 
-# Detect architecture
+# ── Architecture ─────────────────────────────────────────────────────
+
+step "Detecting system"
+
 ARCH=$(uname -m)
 case "$ARCH" in
   aarch64|arm64) GOARCH="arm64" ;;
   armv7l|armhf)  GOARCH="arm" ;;
   x86_64)        GOARCH="amd64" ;;
-  *)
-    echo "Unsupported architecture: $ARCH"
-    exit 1
-    ;;
+  *)             fail "Unsupported architecture: $ARCH" ;;
 esac
-echo "Detected architecture: $ARCH (Go: linux/$GOARCH)"
+ok "Architecture: $ARCH → linux/$GOARCH"
 
-# Create install directory
-echo ""
-echo "Installing to $INSTALL_DIR..."
+# ── Install directory ────────────────────────────────────────────────
+
 mkdir -p "$INSTALL_DIR"
+ok "Install directory: $INSTALL_DIR"
 
-# Download latest release binary
-echo "Downloading latest release..."
-DOWNLOAD_URL=$(curl -s "https://api.github.com/repos/$REPO/releases/latest" \
+# ── Get the binary ───────────────────────────────────────────────────
+
+step "Getting rockiscope binary"
+
+# Try GitHub release first
+DOWNLOAD_URL=$(curl -sf "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
   | grep "browser_download_url.*linux.*${GOARCH}" \
   | head -1 \
-  | cut -d '"' -f 4)
+  | cut -d '"' -f 4 || true)
 
-if [ -z "$DOWNLOAD_URL" ]; then
-  echo "Could not find a release binary for linux/$GOARCH."
-  echo "You may need to build from source:"
-  echo "  GOOS=linux GOARCH=$GOARCH go build -o rockiscope"
-  echo "  scp rockiscope pi@<your-pi>:$INSTALL_DIR/"
-  echo ""
-  echo "Continuing with setup (binary not downloaded)..."
-else
-  curl -L -o "$INSTALL_DIR/rockiscope" "$DOWNLOAD_URL"
+if [ -n "$DOWNLOAD_URL" ]; then
+  echo "  📦 Found release binary"
+  (curl -sfL -o "$INSTALL_DIR/rockiscope" "$DOWNLOAD_URL") &
+  spin $! "Downloading binary"
   chmod +x "$INSTALL_DIR/rockiscope"
-  echo "Binary downloaded successfully."
+else
+  echo "  📦 No release found — building from source"
+
+  # Check for git
+  if ! command -v git &>/dev/null; then
+    fail "git is required to build from source. Install it with: sudo apt install git"
+  fi
+
+  # Check for Go
+  if ! command -v go &>/dev/null; then
+    warn "Go not found — installing via apt"
+    (sudo apt-get update -qq && sudo apt-get install -y -qq golang-go) &
+    spin $! "Installing Go"
+  fi
+
+  GO_VERSION=$(go version | grep -oP '\d+\.\d+' | head -1)
+  ok "Go $GO_VERSION found"
+
+  # Clone and build
+  TMPDIR=$(mktemp -d)
+  trap "rm -rf $TMPDIR" EXIT
+
+  (git clone --depth 1 "https://github.com/$REPO.git" "$TMPDIR/rockiscope" 2>/dev/null) &
+  spin $! "Cloning repository"
+
+  (cd "$TMPDIR/rockiscope" && go build -o "$INSTALL_DIR/rockiscope" . 2>&1) &
+  spin $! "Building binary"
+
+  chmod +x "$INSTALL_DIR/rockiscope"
 fi
 
-# Collect Bluesky credentials
-echo ""
-echo "--- Bluesky Configuration ---"
-echo "You need a Bluesky app password."
-echo "Create one at: https://bsky.app/settings/app-passwords"
-echo ""
+ok "Binary installed to $INSTALL_DIR/rockiscope"
 
-read -rp "Bluesky username (e.g. yourname.bsky.social): " BS_USER
-read -rsp "Bluesky app password: " BS_PASS
-echo ""
+# Verify it runs
+if "$INSTALL_DIR/rockiscope" version &>/dev/null; then
+  VERSION=$("$INSTALL_DIR/rockiscope" version 2>&1)
+  ok "$VERSION"
+else
+  warn "Binary built but version check failed — continuing anyway"
+fi
 
-# Write .env file
-cat > "$INSTALL_DIR/.env" << EOF
+# ── Bluesky credentials ─────────────────────────────────────────────
+
+step "Bluesky configuration"
+
+if [ -f "$INSTALL_DIR/.env" ]; then
+  echo "  📄 Existing .env found"
+  read -rp "  Overwrite credentials? [y/N] " overwrite
+  if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
+    ok "Keeping existing credentials"
+    SKIP_CREDS=1
+  fi
+fi
+
+if [ "${SKIP_CREDS:-}" != "1" ]; then
+  echo "  🔑 You need a Bluesky app password"
+  echo "     Create one at: https://bsky.app/settings/app-passwords"
+  echo ""
+  read -rp "  Bluesky username (e.g. yourname.bsky.social): " BS_USER
+  read -rsp "  Bluesky app password: " BS_PASS
+  echo ""
+
+  if [ -z "$BS_USER" ] || [ -z "$BS_PASS" ]; then
+    fail "Username and password are required"
+  fi
+
+  cat > "$INSTALL_DIR/.env" << EOF
 BLUESKY_USERNAME=$BS_USER
 BLUESKY_PASSWORD=$BS_PASS
 EOF
-chmod 600 "$INSTALL_DIR/.env"
-echo "Credentials saved to $INSTALL_DIR/.env"
+  chmod 600 "$INSTALL_DIR/.env"
+  ok "Credentials saved to $INSTALL_DIR/.env"
 
-# Install systemd service
-echo ""
-echo "--- Setting up systemd service ---"
+  # Test auth
+  echo ""
+  (cd "$INSTALL_DIR" && source .env && export BLUESKY_USERNAME BLUESKY_PASSWORD && "$INSTALL_DIR/rockiscope" test-auth >/dev/null 2>&1) &
+  spin $! "Testing Bluesky authentication" || warn "Auth test failed — check your credentials"
+fi
+
+# ── systemd service ──────────────────────────────────────────────────
+
+step "Setting up systemd service"
 
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
 [Unit]
@@ -90,19 +170,23 @@ WantedBy=multi-user.target
 EOF
 
 systemctl daemon-reload
-systemctl enable "$SERVICE_NAME"
-systemctl start "$SERVICE_NAME"
+systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
+ok "Service enabled"
+
+systemctl restart "$SERVICE_NAME"
+ok "Service started"
+
+# ── Done ─────────────────────────────────────────────────────────────
 
 echo ""
-echo "=== Installation Complete ==="
+echo "  ⚾ Rockiscope is live! ⚾"
 echo ""
-echo "Rockiscope is now running as a systemd service."
+echo "  Commands:"
+echo "    sudo systemctl status rockiscope     # check status"
+echo "    sudo systemctl restart rockiscope    # restart"
+echo "    tail -f $INSTALL_DIR/rockiscope.log  # view logs"
+echo "    $INSTALL_DIR/rockiscope preview      # preview today's post"
+echo "    $INSTALL_DIR/rockiscope post         # force post now"
 echo ""
-echo "Useful commands:"
-echo "  sudo systemctl status $SERVICE_NAME    # check status"
-echo "  sudo systemctl restart $SERVICE_NAME   # restart"
-echo "  sudo systemctl stop $SERVICE_NAME      # stop"
-echo "  tail -f $INSTALL_DIR/rockiscope.log    # view logs"
-echo "  $INSTALL_DIR/rockiscope --dry-run      # test without posting"
+echo "  Maybe this is our year. Probably not. 🏔️"
 echo ""
-echo "Go Rockies!"
