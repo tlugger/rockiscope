@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net/http"
 	"time"
 )
@@ -14,10 +15,29 @@ type PostRef struct {
 	CID string
 }
 
+// ImageData holds a PNG image to attach to a post.
+type ImageData struct {
+	Bytes  []byte
+	Alt    string
+	Width  int
+	Height int
+}
+
+// BlobRef is the Bluesky blob reference returned after upload.
+type BlobRef struct {
+	Type     string `json:"$type"`
+	Ref      refObj `json:"ref"`
+	MimeType string `json:"mimeType"`
+	Size     int    `json:"size"`
+}
+
+type refObj struct {
+	Link string `json:"$link"`
+}
+
 // Poster is the interface for posting to social media.
 type Poster interface {
-	Post(text string) (*PostRef, error)
-	Reply(text string, parent PostRef) (*PostRef, error)
+	Post(text string, image *ImageData) (*PostRef, error)
 }
 
 // Client posts to Bluesky via the AT Protocol XRPC API.
@@ -33,13 +53,12 @@ type Client struct {
 func NewClient(username, password string) *Client {
 	return &Client{
 		baseURL:    "https://bsky.social",
-		httpClient: &http.Client{Timeout: 15 * time.Second},
+		httpClient: &http.Client{Timeout: 30 * time.Second},
 		username:   username,
 		password:   password,
 	}
 }
 
-// Authenticate creates a session with Bluesky. Must be called before Post.
 func (c *Client) Authenticate() error {
 	return c.authenticateWithURL(c.baseURL + "/xrpc/com.atproto.server.createSession")
 }
@@ -77,26 +96,14 @@ func (c *Client) authenticateWithURL(url string) error {
 	return nil
 }
 
-func (c *Client) Post(text string) (*PostRef, error) {
-	if err := c.ensureAuth(); err != nil {
+func (c *Client) Post(text string, image *ImageData) (*PostRef, error) {
+	if err := c.Authenticate(); err != nil {
 		return nil, err
 	}
-	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, nil)
+	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image)
 }
 
-func (c *Client) Reply(text string, parent PostRef) (*PostRef, error) {
-	if err := c.ensureAuth(); err != nil {
-		return nil, err
-	}
-	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, &parent)
-}
-
-// ensureAuth re-authenticates before each post to avoid expired tokens.
-func (c *Client) ensureAuth() error {
-	return c.Authenticate()
-}
-
-func (c *Client) createRecord(url, text string, parent *PostRef) (*PostRef, error) {
+func (c *Client) createRecord(url, text string, image *ImageData) (*PostRef, error) {
 	if c.accessJwt == "" || c.did == "" {
 		return nil, fmt.Errorf("not authenticated — call Authenticate() first")
 	}
@@ -107,14 +114,23 @@ func (c *Client) createRecord(url, text string, parent *PostRef) (*PostRef, erro
 		"createdAt": time.Now().UTC().Format(time.RFC3339),
 	}
 
-	if parent != nil {
-		ref := map[string]interface{}{
-			"uri": parent.URI,
-			"cid": parent.CID,
+	if image != nil && len(image.Bytes) > 0 {
+		blob, err := c.uploadBlob(image.Bytes, "image/png")
+		if err != nil {
+			return nil, fmt.Errorf("uploading image: %w", err)
 		}
-		rec["reply"] = map[string]interface{}{
-			"root":   ref,
-			"parent": ref,
+		rec["embed"] = map[string]interface{}{
+			"$type": "app.bsky.embed.images",
+			"images": []map[string]interface{}{
+				{
+					"alt":   image.Alt,
+					"image": blob,
+					"aspectRatio": map[string]interface{}{
+						"width":  image.Width,
+						"height": image.Height,
+					},
+				},
+			},
 		}
 	}
 
@@ -158,27 +174,51 @@ func (c *Client) createRecord(url, text string, parent *PostRef) (*PostRef, erro
 	return &PostRef{URI: result.URI, CID: result.CID}, nil
 }
 
-// DryRunPoster implements Poster but just prints to a callback instead of posting.
-type DryRunPoster struct {
-	OnPost func(text string)
-	seq    int
+func (c *Client) uploadBlob(data []byte, mimeType string) (*BlobRef, error) {
+	url := c.baseURL + "/xrpc/com.atproto.repo.uploadBlob"
+
+	req, err := http.NewRequest("POST", url, bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	req.Header.Set("Authorization", "Bearer "+c.accessJwt)
+	req.Header.Set("Content-Type", mimeType)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("uploading blob: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return nil, fmt.Errorf("blob upload returned status %d: %s", resp.StatusCode, string(body))
+	}
+
+	var result struct {
+		Blob *BlobRef `json:"blob"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return nil, fmt.Errorf("decoding blob response: %w", err)
+	}
+
+	return result.Blob, nil
 }
 
-func (d *DryRunPoster) Post(text string) (*PostRef, error) {
+// DryRunPoster implements Poster but prints to a callback instead of posting.
+type DryRunPoster struct {
+	OnPost  func(text string)
+	OnImage func(imgBytes []byte)
+	seq     int
+}
+
+func (d *DryRunPoster) Post(text string, image *ImageData) (*PostRef, error) {
 	d.seq++
 	if d.OnPost != nil {
 		d.OnPost(text)
 	}
-	return &PostRef{
-		URI: fmt.Sprintf("at://dry-run/app.bsky.feed.post/%d", d.seq),
-		CID: fmt.Sprintf("dry-run-cid-%d", d.seq),
-	}, nil
-}
-
-func (d *DryRunPoster) Reply(text string, parent PostRef) (*PostRef, error) {
-	d.seq++
-	if d.OnPost != nil {
-		d.OnPost(text)
+	if d.OnImage != nil && image != nil {
+		d.OnImage(image.Bytes)
 	}
 	return &PostRef{
 		URI: fmt.Sprintf("at://dry-run/app.bsky.feed.post/%d", d.seq),

@@ -45,11 +45,19 @@ curl -sSL https://raw.githubusercontent.com/tlugger/rockiscope/main/install.sh |
 
 This will:
 - 📦 Download the latest release binary (or clone + build from source if no release exists)
-- 🔑 Prompt for your Bluesky [app password](https://bsky.app/settings/app-passwords)
-- ✅ Test authentication
-- ⚙️ Install and start a systemd service
+- 📄 Create a `.env` file with placeholder Bluesky credentials
+- ⚙️ Install and enable a systemd service
 
-That's it. It runs itself from there — wakes up at 5 AM MST, checks the schedule, posts an hour before game time, goes back to sleep. More consistent than the lineup, at least.
+After the install, edit your credentials and start the service:
+
+```bash
+sudo nano /home/pi/rockiscope/.env    # add your Bluesky app password
+sudo systemctl start rockiscope
+```
+
+Create an app password at [bsky.app/settings/app-passwords](https://bsky.app/settings/app-passwords).
+
+To **update**, just re-run the same install command — it'll stop the service, download the latest binary, and restart.
 
 ### Managing the service
 
@@ -57,15 +65,6 @@ That's it. It runs itself from there — wakes up at 5 AM MST, checks the schedu
 sudo systemctl status rockiscope      # check status
 sudo systemctl restart rockiscope     # restart
 tail -f /home/pi/rockiscope/rockiscope.log  # logs
-```
-
-### Updating
-
-```bash
-# Build on your machine, copy to Pi, restart
-GOOS=linux GOARCH=arm64 go build -o rockiscope
-scp rockiscope pi@yourpi:/home/pi/rockiscope/
-ssh pi@yourpi 'sudo systemctl restart rockiscope'
 ```
 
 ## 📊 Data Sources
@@ -76,7 +75,7 @@ ssh pi@yourpi 'sudo systemctl restart rockiscope'
 
 ## ✨ Sample Posts
 
-Posts are threaded — game info first, full horoscope as a reply.
+Each post includes the game info and prediction as text, with the full horoscope rendered as an attached image card — crescent moon, constellation, and all.
 
 **Game Day** (1 hour before first pitch):
 ```
@@ -87,28 +86,14 @@ Posts are threaded — game info first, full horoscope as a reply.
 
 🔮 A slight celestial nudge toward a Rockies defeat (55%)
 ```
-↳ reply:
-```
-♋ Today's Cancer horoscope:
-
-Cancer, the energy around you is intense today. You may
-feel pulled in multiple directions. Take a deep breath and
-remember that the stars are aligned in your favor, even if
-it doesn't feel like it right now.
-```
+📎 Attached: horoscope image card
 
 **Off Day** (10 AM MST):
 ```
 ⚾ No Rockies game today.
 📊 5-6 (.455) | Run Diff: -3 | L1
 ```
-↳ reply:
-```
-♋ Today's Cancer horoscope:
-
-Rest and reflection bring clarity today. The cosmos suggest
-patience and self-care during this quiet moment.
-```
+📎 Attached: horoscope image card
 
 ---
 

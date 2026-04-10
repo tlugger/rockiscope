@@ -9,15 +9,12 @@ import (
 	"github.com/tlugger/rockiscope/internal/prediction"
 )
 
-const maxBlueskyChars = 300
-
-// ThreadPost holds the main post and an optional reply for threading.
-type ThreadPost struct {
-	Main  string
-	Reply string // empty if no horoscope available
+// Post holds the text and optional horoscope for image generation.
+type Post struct {
+	Text          string
+	HoroscopeText string // full text for image card, empty if unavailable
 }
 
-// GameDayPost builds the post text for a game day.
 type GameDayPost struct {
 	Game       *mlb.Game
 	Record     *mlb.TeamRecord
@@ -27,33 +24,26 @@ type GameDayPost struct {
 	Prediction prediction.Prediction
 }
 
-// OffDayPost builds the post text for an off day.
 type OffDayPost struct {
 	Record    *mlb.TeamRecord
 	Horoscope *horoscope.Horoscope
 }
 
-// FormatGameDay produces the game day thread.
-func FormatGameDay(p GameDayPost) ThreadPost {
+func FormatGameDay(p GameDayPost) Post {
 	var b strings.Builder
 
-	// Matchup
 	opponent := p.Game.Opponent().Name
 	location := "vs"
 	if !p.Game.IsHome {
 		location = "@"
 	}
 	fmt.Fprintf(&b, "⚾ Rockies %s %s\n", location, opponent)
-
-	// Game info
 	fmt.Fprintf(&b, "🕐 %s at %s\n", p.Game.FormatGameTime(), p.Game.Venue)
 
-	// Pitcher
 	if p.Pitcher != nil && p.Pitcher.GamesStarted > 0 {
 		fmt.Fprintf(&b, "🪖 %s (%.2f ERA, %d-%d)\n", p.Pitcher.FullName, p.Pitcher.ERA, p.Pitcher.Wins, p.Pitcher.Losses)
 	}
 
-	// Record + H2H
 	if p.Record != nil {
 		fmt.Fprintf(&b, "📊 %d-%d", p.Record.Wins, p.Record.Losses)
 		if p.H2H != nil && p.H2H.GamesPlayed > 0 {
@@ -66,22 +56,18 @@ func FormatGameDay(p GameDayPost) ThreadPost {
 	}
 
 	b.WriteString("\n")
-
-	// Prediction
 	fmt.Fprintf(&b, "🔮 %s", p.Prediction.FormatPrediction())
 
-	thread := ThreadPost{Main: strings.TrimSpace(b.String())}
+	post := Post{Text: strings.TrimSpace(b.String())}
 
-	// Horoscope as reply
 	if p.Horoscope != nil {
-		thread.Reply = formatHoroscopeReply(p.Horoscope.Text)
+		post.HoroscopeText = p.Horoscope.Text
 	}
 
-	return thread
+	return post
 }
 
-// FormatOffDay produces the off day thread.
-func FormatOffDay(p OffDayPost) ThreadPost {
+func FormatOffDay(p OffDayPost) Post {
 	var b strings.Builder
 
 	b.WriteString("⚾ No Rockies game today.\n")
@@ -99,26 +85,13 @@ func FormatOffDay(p OffDayPost) ThreadPost {
 		b.WriteString("\n")
 	}
 
-	thread := ThreadPost{Main: strings.TrimSpace(b.String())}
+	post := Post{Text: strings.TrimSpace(b.String())}
 
 	if p.Horoscope != nil {
-		thread.Reply = formatHoroscopeReply(p.Horoscope.Text)
+		post.HoroscopeText = p.Horoscope.Text
 	}
 
-	return thread
-}
-
-func formatHoroscopeReply(text string) string {
-	prefix := "♋ Today's Cancer horoscope:\n\n"
-	maxText := maxBlueskyChars - len(prefix)
-	if len(text) > maxText {
-		truncated := text[:maxText-3]
-		if idx := strings.LastIndex(truncated, " "); idx > 0 {
-			truncated = truncated[:idx]
-		}
-		text = truncated + "..."
-	}
-	return prefix + text
+	return post
 }
 
 func shortName(name string) string {

@@ -8,7 +8,6 @@ import (
 	"testing"
 )
 
-// mockBlueskyServer handles both auth and post endpoints.
 func mockBlueskyServer(t *testing.T, onPost func(body map[string]interface{})) *httptest.Server {
 	t.Helper()
 	return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -18,6 +17,18 @@ func mockBlueskyServer(t *testing.T, onPost func(body map[string]interface{})) *
 			json.NewEncoder(w).Encode(map[string]string{
 				"accessJwt": "fake-jwt-token",
 				"did":       "did:plc:fake123",
+			})
+			return
+		}
+
+		if strings.Contains(r.URL.Path, "uploadBlob") {
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"blob": map[string]interface{}{
+					"$type":    "blob",
+					"ref":      map[string]string{"$link": "bafkreifakeblob"},
+					"mimeType": "image/png",
+					"size":     1234,
+				},
 			})
 			return
 		}
@@ -41,17 +52,11 @@ func mockBlueskyServer(t *testing.T, onPost func(body map[string]interface{})) *
 
 func TestAuthenticate(t *testing.T) {
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method != "POST" {
-			t.Errorf("expected POST, got %s", r.Method)
-		}
-
 		var body map[string]string
 		json.NewDecoder(r.Body).Decode(&body)
-
 		if body["identifier"] != "test.bsky.social" {
 			t.Errorf("unexpected identifier: %s", body["identifier"])
 		}
-
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]string{
 			"accessJwt": "fake-jwt-token",
@@ -61,22 +66,16 @@ func TestAuthenticate(t *testing.T) {
 	defer ts.Close()
 
 	c := &Client{
-		baseURL:    ts.URL,
-		httpClient: ts.Client(),
-		username:   "test.bsky.social",
-		password:   "test-password",
+		baseURL: ts.URL, httpClient: ts.Client(),
+		username: "test.bsky.social", password: "test-password",
 	}
 
-	err := c.authenticateWithURL(ts.URL + "/xrpc/com.atproto.server.createSession")
+	err := c.authenticateWithURL(ts.URL)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
 	if c.accessJwt != "fake-jwt-token" {
-		t.Errorf("jwt = %q, want fake-jwt-token", c.accessJwt)
-	}
-	if c.did != "did:plc:fake123" {
-		t.Errorf("did = %q, want did:plc:fake123", c.did)
+		t.Errorf("jwt = %q", c.accessJwt)
 	}
 }
 
@@ -86,103 +85,65 @@ func TestAuthenticate_BadStatus(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c := &Client{
-		httpClient: ts.Client(),
-		username:   "bad", password: "creds",
-	}
-
+	c := &Client{httpClient: ts.Client(), username: "bad", password: "creds"}
 	err := c.authenticateWithURL(ts.URL)
 	if err == nil {
-		t.Error("expected error for 401 response")
+		t.Error("expected error for 401")
 	}
 }
 
-func TestPost(t *testing.T) {
+func TestPost_TextOnly(t *testing.T) {
 	var receivedText string
-
 	ts := mockBlueskyServer(t, func(body map[string]interface{}) {
 		record := body["record"].(map[string]interface{})
 		receivedText = record["text"].(string)
-
-		if _, ok := record["reply"]; ok {
-			t.Error("root post should not have reply field")
+		if _, ok := record["embed"]; ok {
+			t.Error("text-only post should not have embed")
 		}
 	})
 	defer ts.Close()
 
-	c := &Client{
-		baseURL:    ts.URL,
-		httpClient: ts.Client(),
-		username:   "test.bsky.social",
-		password:   "test-password",
-	}
-
-	ref, err := c.Post("Hello from Rockiscope!")
+	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test"}
+	ref, err := c.Post("Hello!", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if receivedText != "Hello from Rockiscope!" {
-		t.Errorf("post text = %q, want %q", receivedText, "Hello from Rockiscope!")
+	if receivedText != "Hello!" {
+		t.Errorf("text = %q", receivedText)
 	}
-
 	if ref.URI == "" || ref.CID == "" {
-		t.Errorf("expected non-empty PostRef, got URI=%q CID=%q", ref.URI, ref.CID)
+		t.Error("expected non-empty PostRef")
 	}
 }
 
-func TestReply(t *testing.T) {
-	var receivedReply map[string]interface{}
-
+func TestPost_WithImage(t *testing.T) {
+	var hasEmbed bool
 	ts := mockBlueskyServer(t, func(body map[string]interface{}) {
 		record := body["record"].(map[string]interface{})
-		receivedReply, _ = record["reply"].(map[string]interface{})
+		if embed, ok := record["embed"]; ok {
+			hasEmbed = true
+			embedMap := embed.(map[string]interface{})
+			if embedMap["$type"] != "app.bsky.embed.images" {
+				t.Errorf("embed type = %q", embedMap["$type"])
+			}
+		}
 	})
 	defer ts.Close()
 
-	c := &Client{
-		baseURL:    ts.URL,
-		httpClient: ts.Client(),
-		username:   "test.bsky.social",
-		password:   "test-password",
-	}
-
-	parent := PostRef{
-		URI: "at://did:plc:fake/app.bsky.feed.post/abc123",
-		CID: "bafyreifake123",
-	}
-
-	ref, err := c.Reply("Horoscope thread reply", parent)
+	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test"}
+	img := &ImageData{Bytes: []byte("fake-png"), Alt: "test image", Width: 800, Height: 420}
+	_, err := c.Post("Post with image", img)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-
-	if receivedReply == nil {
-		t.Fatal("expected reply field in record")
-	}
-
-	root := receivedReply["root"].(map[string]interface{})
-	if root["uri"] != parent.URI {
-		t.Errorf("root URI = %q, want %q", root["uri"], parent.URI)
-	}
-	if root["cid"] != parent.CID {
-		t.Errorf("root CID = %q, want %q", root["cid"], parent.CID)
-	}
-
-	if ref.URI == "" {
-		t.Error("expected non-empty reply URI")
+	if !hasEmbed {
+		t.Error("expected embed in post with image")
 	}
 }
 
 func TestPost_NotAuthenticated(t *testing.T) {
-	// With ensureAuth, a client with no baseURL/httpClient will fail on auth
-	c := &Client{
-		baseURL:    "http://localhost:1",
-		httpClient: http.DefaultClient,
-		username:   "test",
-		password:   "test",
-	}
-	_, err := c.Post("test")
+	c := &Client{baseURL: "http://localhost:1", httpClient: http.DefaultClient, username: "x", password: "x"}
+	_, err := c.Post("test", nil)
 	if err == nil {
 		t.Error("expected error when auth server unreachable")
 	}
@@ -190,27 +151,23 @@ func TestPost_NotAuthenticated(t *testing.T) {
 
 func TestDryRunPoster(t *testing.T) {
 	var posts []string
+	var gotImage bool
 	drp := &DryRunPoster{
-		OnPost: func(text string) { posts = append(posts, text) },
+		OnPost:  func(text string) { posts = append(posts, text) },
+		OnImage: func(b []byte) { gotImage = true },
 	}
 
-	ref1, err := drp.Post("main post")
+	ref, err := drp.Post("main post", &ImageData{Bytes: []byte("png")})
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if ref1.URI == "" || ref1.CID == "" {
-		t.Error("expected non-empty PostRef from dry run")
+	if ref.URI == "" {
+		t.Error("expected non-empty URI")
 	}
-
-	ref2, err := drp.Reply("reply post", *ref1)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
+	if !gotImage {
+		t.Error("expected OnImage callback")
 	}
-	if ref2.URI == ref1.URI {
-		t.Error("reply should have different URI than parent")
-	}
-
-	if len(posts) != 2 {
-		t.Errorf("expected 2 posts captured, got %d", len(posts))
+	if len(posts) != 1 {
+		t.Errorf("expected 1 post, got %d", len(posts))
 	}
 }

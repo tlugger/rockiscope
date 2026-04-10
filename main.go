@@ -79,17 +79,14 @@ func cmdPost(logger *log.Logger) {
 }
 
 func cmdPreview(logger *log.Logger) {
-	n := 0
 	poster := &bluesky.DryRunPoster{
 		OnPost: func(text string) {
-			n++
-			if n == 1 {
-				fmt.Println("─── Post ───")
-			} else {
-				fmt.Println("─── Reply ───")
-			}
+			fmt.Println("─── Post ───")
 			fmt.Println(text)
 			fmt.Printf("─── %d chars ───\n", len(text))
+		},
+		OnImage: func(b []byte) {
+			fmt.Printf("─── Image: %d bytes ───\n", len(b))
 		},
 	}
 	sched := newScheduler(logger, poster)

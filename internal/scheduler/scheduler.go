@@ -8,6 +8,7 @@ import (
 	"github.com/tlugger/rockiscope/internal/bluesky"
 	"github.com/tlugger/rockiscope/internal/formatter"
 	"github.com/tlugger/rockiscope/internal/horoscope"
+	imgcard "github.com/tlugger/rockiscope/internal/image"
 	"github.com/tlugger/rockiscope/internal/mlb"
 	"github.com/tlugger/rockiscope/internal/prediction"
 )
@@ -95,9 +96,8 @@ func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
 		s.sleep(waitDur)
 	}
 
-	thread := s.buildGameDayThread(game)
-
-	if err := s.postThread(thread); err != nil {
+	post := s.buildGameDayPost(game)
+	if err := s.publish(post); err != nil {
 		return err
 	}
 
@@ -118,9 +118,8 @@ func (s *Scheduler) handleOffDay(today string) error {
 		s.sleep(waitDur)
 	}
 
-	thread := s.buildOffDayThread()
-
-	if err := s.postThread(thread); err != nil {
+	post := s.buildOffDayPost()
+	if err := s.publish(post); err != nil {
 		return err
 	}
 
@@ -128,7 +127,7 @@ func (s *Scheduler) handleOffDay(today string) error {
 	return nil
 }
 
-func (s *Scheduler) buildGameDayThread(game *mlb.Game) formatter.ThreadPost {
+func (s *Scheduler) buildGameDayPost(game *mlb.Game) formatter.Post {
 	s.logger.Println("gathering game data...")
 
 	record, err := s.mlb.GetTeamRecord()
@@ -179,7 +178,7 @@ func (s *Scheduler) buildGameDayThread(game *mlb.Game) formatter.ThreadPost {
 	})
 }
 
-func (s *Scheduler) buildOffDayThread() formatter.ThreadPost {
+func (s *Scheduler) buildOffDayPost() formatter.Post {
 	record, err := s.mlb.GetTeamRecord()
 	if err != nil {
 		s.logger.Printf("warning: could not get team record: %v", err)
@@ -196,25 +195,30 @@ func (s *Scheduler) buildOffDayThread() formatter.ThreadPost {
 	})
 }
 
-func (s *Scheduler) postThread(thread formatter.ThreadPost) error {
-	s.logger.Printf("posting:\n%s", thread.Main)
+func (s *Scheduler) publish(post formatter.Post) error {
+	s.logger.Printf("posting:\n%s", post.Text)
 
-	ref, err := s.poster.Post(thread.Main)
-	if err != nil {
-		return fmt.Errorf("posting to Bluesky: %w", err)
-	}
-	s.logger.Println("posted successfully!")
-
-	if thread.Reply != "" && ref != nil {
-		s.sleep(2 * time.Second) // brief pause before replying
-		s.logger.Printf("replying with horoscope:\n%s", thread.Reply)
-		if _, err := s.poster.Reply(thread.Reply, *ref); err != nil {
-			s.logger.Printf("warning: could not post horoscope reply: %v", err)
+	var img *bluesky.ImageData
+	if post.HoroscopeText != "" {
+		pngBytes, w, h, err := imgcard.HoroscopeCard(post.HoroscopeText)
+		if err != nil {
+			s.logger.Printf("warning: could not generate horoscope image: %v", err)
 		} else {
-			s.logger.Println("horoscope reply posted!")
+			s.logger.Printf("generated horoscope image (%d bytes, %dx%d)", len(pngBytes), w, h)
+			img = &bluesky.ImageData{
+				Bytes:  pngBytes,
+				Alt:    "Today's Cancer horoscope: " + post.HoroscopeText,
+				Width:  w,
+				Height: h,
+			}
 		}
 	}
 
+	if _, err := s.poster.Post(post.Text, img); err != nil {
+		return fmt.Errorf("posting to Bluesky: %w", err)
+	}
+
+	s.logger.Println("posted successfully!")
 	return nil
 }
 
@@ -248,13 +252,13 @@ func (s *Scheduler) RunOnce() error {
 		return fmt.Errorf("fetching today's game: %w", err)
 	}
 
-	var thread formatter.ThreadPost
+	var post formatter.Post
 	if game != nil {
-		thread = s.buildGameDayThread(game)
+		post = s.buildGameDayPost(game)
 	} else {
 		s.logger.Println("off day — posting horoscope + stats")
-		thread = s.buildOffDayThread()
+		post = s.buildOffDayPost()
 	}
 
-	return s.postThread(thread)
+	return s.publish(post)
 }
