@@ -128,62 +128,18 @@ fi
 
 step "Bluesky configuration"
 
-# Check if we can prompt interactively
-CAN_PROMPT=0
-if [ -t 0 ]; then
-  CAN_PROMPT=1
-fi
-
 if [ -f "$INSTALL_DIR/.env" ]; then
-  echo "  📄 Existing .env found"
-  if [ "$CAN_PROMPT" = "1" ]; then
-    read -rp "  Overwrite credentials? [y/N] " overwrite
-    if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
-      ok "Keeping existing credentials"
-      SKIP_CREDS=1
-    fi
-  else
-    ok "Keeping existing credentials (non-interactive)"
-    SKIP_CREDS=1
-  fi
-fi
-
-if [ "${SKIP_CREDS:-}" != "1" ]; then
-  if [ "$CAN_PROMPT" != "1" ]; then
-    warn "Non-interactive shell — cannot prompt for credentials"
-    echo "  Create $INSTALL_DIR/.env manually:"
-    echo ""
-    echo "    cat > $INSTALL_DIR/.env << 'EOF'"
-    echo "    BLUESKY_USERNAME=yourname.bsky.social"
-    echo "    BLUESKY_PASSWORD=your-app-password"
-    echo "    EOF"
-    echo "    chmod 600 $INSTALL_DIR/.env"
-    echo ""
-    SKIP_CREDS=1
-  else
-    echo "  🔑 You need a Bluesky app password"
-    echo "     Create one at: https://bsky.app/settings/app-passwords"
-    echo ""
-    read -rp "  Bluesky username (e.g. yourname.bsky.social): " BS_USER
-    read -rsp "  Bluesky app password: " BS_PASS
-    echo ""
-
-    if [ -z "$BS_USER" ] || [ -z "$BS_PASS" ]; then
-      fail "Username and password are required"
-    fi
-
-    cat > "$INSTALL_DIR/.env" << EOF
-BLUESKY_USERNAME=$BS_USER
-BLUESKY_PASSWORD=$BS_PASS
+  ok "Existing .env found — keeping credentials"
+else
+  cat > "$INSTALL_DIR/.env" << 'EOF'
+BLUESKY_USERNAME=yourname.bsky.social
+BLUESKY_PASSWORD=your-app-password
 EOF
-    chmod 600 "$INSTALL_DIR/.env"
-    ok "Credentials saved to $INSTALL_DIR/.env"
-
-    # Test auth
-    echo ""
-    (cd "$INSTALL_DIR" && source .env && export BLUESKY_USERNAME BLUESKY_PASSWORD && "$INSTALL_DIR/rockiscope" test-auth >/dev/null 2>&1) &
-    spin $! "Testing Bluesky authentication" || warn "Auth test failed — check your credentials"
-  fi
+  chmod 600 "$INSTALL_DIR/.env"
+  ok "Created $INSTALL_DIR/.env with placeholder values"
+  warn "Edit .env with your real Bluesky credentials before starting"
+  echo "     Create an app password at: https://bsky.app/settings/app-passwords"
+  NEEDS_CREDS=1
 fi
 
 # ── systemd service ──────────────────────────────────────────────────
@@ -214,17 +170,25 @@ systemctl daemon-reload
 systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
 ok "Service enabled"
 
-if [ -f "$INSTALL_DIR/.env" ]; then
+if [ "${NEEDS_CREDS:-}" = "1" ]; then
+  warn "Service installed but not started — update .env first"
+else
   systemctl restart "$SERVICE_NAME"
   ok "Service started"
-else
-  warn "Service installed but not started — create .env first, then: sudo systemctl start rockiscope"
 fi
 
 # ── Done ─────────────────────────────────────────────────────────────
 
 echo ""
-echo "  ⚾ Rockiscope is live! ⚾"
+if [ "${NEEDS_CREDS:-}" = "1" ]; then
+  echo "  ⚾ Rockiscope installed! ⚾"
+  echo ""
+  echo "  Next steps:"
+  echo "    1. Edit $INSTALL_DIR/.env with your Bluesky credentials"
+  echo "    2. sudo systemctl start rockiscope"
+else
+  echo "  ⚾ Rockiscope is live! ⚾"
+fi
 echo ""
 echo "  Commands:"
 echo "    sudo systemctl status rockiscope     # check status"
