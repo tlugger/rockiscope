@@ -78,11 +78,22 @@ func (c *Client) authenticateWithURL(url string) error {
 }
 
 func (c *Client) Post(text string) (*PostRef, error) {
+	if err := c.ensureAuth(); err != nil {
+		return nil, err
+	}
 	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, nil)
 }
 
 func (c *Client) Reply(text string, parent PostRef) (*PostRef, error) {
+	if err := c.ensureAuth(); err != nil {
+		return nil, err
+	}
 	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, &parent)
+}
+
+// ensureAuth re-authenticates before each post to avoid expired tokens.
+func (c *Client) ensureAuth() error {
+	return c.Authenticate()
 }
 
 func (c *Client) createRecord(url, text string, parent *PostRef) (*PostRef, error) {
