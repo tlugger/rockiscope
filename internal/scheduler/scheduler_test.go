@@ -24,6 +24,7 @@ func (m *mockMLB) GetTodayGame() (*mlb.Game, error)                  { return m.
 func (m *mockMLB) GetTeamRecord() (*mlb.TeamRecord, error)           { return m.record, nil }
 func (m *mockMLB) GetPitcherStats(id int) (*mlb.PitcherStats, error) { return m.pitcher, nil }
 func (m *mockMLB) GetHeadToHead(id int) (*mlb.H2HRecord, error)     { return m.h2h, nil }
+func (m *mockMLB) GetGamesSince(date string) ([]mlb.GameResult, error) { return nil, nil }
 
 type mockHoroscope struct {
 	horo *horoscope.Horoscope
@@ -38,6 +39,18 @@ type mockPoster struct {
 }
 
 func (m *mockPoster) Post(text string, image *bluesky.ImageData) (*bluesky.PostRef, error) {
+	m.seq++
+	m.posts = append(m.posts, text)
+	if image != nil {
+		m.images++
+	}
+	return &bluesky.PostRef{
+		URI: fmt.Sprintf("at://mock/post/%d", m.seq),
+		CID: fmt.Sprintf("mock-cid-%d", m.seq),
+	}, nil
+}
+
+func (m *mockPoster) Reply(text string, image *bluesky.ImageData, parentURI, rootURI string) (*bluesky.PostRef, error) {
 	m.seq++
 	m.posts = append(m.posts, text)
 	if image != nil {

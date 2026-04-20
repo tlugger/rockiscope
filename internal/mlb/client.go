@@ -56,6 +56,61 @@ func (c *Client) GetHeadToHead(opponentID int) (*H2HRecord, error) {
 	return c.getH2HFromURL(url, opponentID)
 }
 
+type GameResult struct {
+	GamePk       int    `json:"gamePk"`
+	Date        string `json:"date"`
+	OpponentID  int    `json:"opponentId"`
+	Opponent    string `json:"opponent"`
+	IsHome      bool   `json:"isHome"`
+	RockiesScore int   `json:"rockiesScore"`
+	OppScore    int    `json:"oppScore"`
+	Won         bool   `json:"won"`
+	Status     string `json:"status"`
+}
+
+func (c *Client) GetGamesSince(date string) ([]GameResult, error) {
+	url := fmt.Sprintf("%s/schedule?sportId=1&teamId=%d&startDate=%s&endDate=%s&hydrate=linescore",
+		baseURL, c.teamID, date, date)
+	var resp scheduleResponse
+	if err := c.getJSON(url, &resp); err != nil {
+		return nil, fmt.Errorf("fetching games: %w", err)
+	}
+
+	var results []GameResult
+	for _, d := range resp.Dates {
+		for _, g := range d.Games {
+			if g.Status.AbstractGameState != "Final" {
+				continue
+			}
+
+			var gr GameResult
+			gr.GamePk = g.GamePk
+			gr.Date = g.GameDate
+			gr.Status = g.Status.AbstractGameState
+
+			if g.Teams.Away.Team.ID == c.teamID {
+				gr.OpponentID = g.Teams.Home.Team.ID
+				gr.Opponent = g.Teams.Home.Team.Name
+				gr.IsHome = false
+				gr.RockiesScore = g.Teams.Away.Score
+				gr.OppScore = g.Teams.Home.Score
+				gr.Won = g.Teams.Away.Score > g.Teams.Home.Score
+			} else {
+				gr.OpponentID = g.Teams.Away.Team.ID
+				gr.Opponent = g.Teams.Away.Team.Name
+				gr.IsHome = true
+				gr.RockiesScore = g.Teams.Home.Score
+				gr.OppScore = g.Teams.Away.Score
+				gr.Won = g.Teams.Home.Score > g.Teams.Away.Score
+			}
+
+			results = append(results, gr)
+		}
+	}
+
+	return results, nil
+}
+
 // URL-parameterized methods — used by both production code and tests.
 
 func (c *Client) getGameFromURL(url string) (*Game, error) {

@@ -13,6 +13,8 @@ import (
 type Post struct {
 	Text          string
 	HoroscopeText string // full text for image card, empty if unavailable
+	Prediction    prediction.Prediction
+	Game         *mlb.Game
 }
 
 type GameDayPost struct {
@@ -58,7 +60,11 @@ func FormatGameDay(p GameDayPost) Post {
 	b.WriteString("\n")
 	fmt.Fprintf(&b, "🔮 %s", p.Prediction.FormatPrediction())
 
-	post := Post{Text: strings.TrimSpace(b.String())}
+	post := Post{
+		Text:       strings.TrimSpace(b.String()),
+		Prediction: p.Prediction,
+		Game:      p.Game,
+	}
 
 	if p.Horoscope != nil {
 		post.HoroscopeText = p.Horoscope.Text

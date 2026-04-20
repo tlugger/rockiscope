@@ -24,7 +24,8 @@ type Scheduler struct {
 	logger    *log.Logger
 	dataDir   string
 
-	lastPostDate string
+	lastPostDate  string
+	predHistory *prediction.PredictionHistory
 }
 
 type Config struct {
@@ -46,6 +47,7 @@ func New(cfg Config) *Scheduler {
 		dataDir:   cfg.DataDir,
 	}
 	loadLastPostDate(s)
+	loadPredictionHistory(s)
 	return s
 }
 
@@ -92,6 +94,38 @@ func saveLastPostDate(s *Scheduler) error {
 	}
 	s.logger.Printf("saved last post date: %s", s.lastPostDate)
 	return nil
+}
+
+func loadPredictionHistory(s *Scheduler) {
+	hist, err := prediction.LoadHistory(s.dataDir)
+	if err != nil {
+		s.logger.Printf("warning: could not load prediction history: %v", err)
+		s.predHistory = &prediction.PredictionHistory{
+			Predictions: nil,
+			Current:    prediction.DefaultWeights(),
+		}
+		return
+	}
+
+	if len(hist.Predictions) == 0 {
+		s.logger.Println("first run - starting fresh with default weights")
+		s.logger.Println("prediction history will accumulate over the season")
+	}
+
+	s.predHistory = hist
+	s.logger.Printf("prediction engine: %d games recorded, %d correct",
+		len(hist.Predictions), hist.CorrectCount())
+}
+
+func (s *Scheduler) savePredictionHistory() error {
+	if s.dataDir == "" {
+		s.logger.Println("no data dir configured, not saving prediction history")
+		return nil
+	}
+	if s.predHistory == nil {
+		return nil
+	}
+	return prediction.SaveHistory(s.predHistory, s.dataDir)
 }
 
 func (s *Scheduler) Run() {
@@ -149,9 +183,13 @@ func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
 	}
 
 	post := s.buildGameDayPost(game)
-	if err := s.publish(post); err != nil {
+	img := s.generateImage(post.HoroscopeText)
+	postRef, err := s.poster.Post(post.Text, img)
+	if err != nil {
 		return err
 	}
+
+	s.recordPrediction(today, game, post.Prediction, postRef.URI)
 
 	s.lastPostDate = today
 	if err := saveLastPostDate(s); err != nil {
@@ -174,15 +212,37 @@ func (s *Scheduler) handleOffDay(today string) error {
 	}
 
 	post := s.buildOffDayPost()
-	if err := s.publish(post); err != nil {
+	img := s.generateImage(post.HoroscopeText)
+	postRef, err := s.poster.Post(post.Text, img)
+	if err != nil {
 		return err
 	}
+
+	s.recordOffDay(today, post.Prediction, postRef.URI)
 
 	s.lastPostDate = today
 	if err := saveLastPostDate(s); err != nil {
 		s.logger.Printf("warning: could not save last post date: %v", err)
 	}
 	return nil
+}
+
+func (s *Scheduler) generateImage(horoText string) *bluesky.ImageData {
+	if horoText == "" {
+		return nil
+	}
+	pngBytes, w, h, err := imgcard.HoroscopeCard(horoText)
+	if err != nil {
+		s.logger.Printf("warning: could not generate horoscope image: %v", err)
+		return nil
+	}
+	s.logger.Printf("generated horoscope image (%d bytes, %dx%d)", len(pngBytes), w, h)
+	return &bluesky.ImageData{
+		Bytes:  pngBytes,
+		Alt:    "Today's Cancer horoscope: " + horoText,
+		Width:  w,
+		Height: h,
+	}
 }
 
 func (s *Scheduler) buildGameDayPost(game *mlb.Game) formatter.Post {
@@ -280,6 +340,157 @@ func (s *Scheduler) publish(post formatter.Post) error {
 	return nil
 }
 
+func (s *Scheduler) recordPrediction(date string, game *mlb.Game, pred prediction.Prediction, postURI string) {
+	rec := prediction.PredictionRecord{
+		Date:            date,
+		Opponent:        game.Opponent().Name,
+		IsHome:          game.IsHome,
+		Predicted:       pred.Pick,
+		Confidence:     pred.WinProbability * 100,
+		PostURI:         postURI,
+		GamePK:          game.GamePk,
+		WinProbability: pred.WinProbability,
+	}
+
+	if s.predHistory == nil {
+		return
+	}
+	s.predHistory.Add(rec)
+	if err := s.savePredictionHistory(); err != nil {
+		s.logger.Printf("warning: could not save prediction: %v", err)
+	}
+}
+
+func (s *Scheduler) recordOffDay(date string, pred prediction.Prediction, postURI string) {
+	rec := prediction.PredictionRecord{
+		Date:            date,
+		Opponent:        "Off Day",
+		IsHome:          false,
+		Predicted:       "N/A",
+		Confidence:     0,
+		PostURI:         postURI,
+		GamePK:         0,
+		WinProbability: pred.WinProbability,
+	}
+
+	if s.predHistory == nil {
+		return
+	}
+	s.predHistory.Add(rec)
+	if err := s.savePredictionHistory(); err != nil {
+		s.logger.Printf("warning: could not save prediction: %v", err)
+	}
+}
+
+func (s *Scheduler) Tick() error {
+	s.logger.Println("checking for completed games to update predictions...")
+	if err := s.checkForCompletedGames(); err != nil {
+		s.logger.Printf("warning: could not check completed games: %v", err)
+	}
+	return s.tick()
+}
+
+func (s *Scheduler) checkForCompletedGames() error {
+	if s.predHistory == nil || len(s.predHistory.Predictions) == 0 {
+		s.logger.Println("no predictions to check")
+		return nil
+	}
+
+	denver := mlb.DenverLocation()
+	today := s.now().In(denver).Format("2006-01-02")
+
+	games, err := s.mlb.GetGamesSince(s.lastPostDate)
+	if err != nil {
+		return fmt.Errorf("fetching completed games: %w", err)
+	}
+
+	for _, gr := range games {
+		s.processCompletedGame(gr, today)
+	}
+
+	recent := s.predHistory.Recent(10)
+	if len(recent) >= 3 {
+		accuracy := prediction.CalculateFactorAccuracy(recent)
+		newWeights := prediction.AdjustWeights(s.predHistory.Current, accuracy, len(recent))
+		s.predHistory.Current = newWeights
+		s.logger.Printf("adjusted weights: winRate=%.0f%% pitcher=%.0f%% h2h=%.0f%% homeAway=%.0f%% momentum=%.0f%% stars=%.0f%%",
+			newWeights.WinRate*100, newWeights.Pitcher*100, newWeights.H2H*100,
+			newWeights.HomeAway*100, newWeights.Momentum*100, newWeights.Stars*100)
+		if err := s.savePredictionHistory(); err != nil {
+			s.logger.Printf("warning: could not save weights: %v", err)
+		}
+	}
+
+	return nil
+}
+
+func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) {
+	if s.predHistory == nil {
+		return
+	}
+
+	found := false
+	for i := range s.predHistory.Predictions {
+		p := &s.predHistory.Predictions[i]
+		if p.Actual != "" {
+			continue
+		}
+		if p.GamePK == gr.GamePk || (p.Date == gr.Date && p.Opponent == gr.Opponent) {
+			actual := "L"
+			if gr.Won {
+				actual = "W"
+			}
+			p.Actual = actual
+			found = true
+
+			correct := p.Predicted == actual
+			resultStatus := "wrong"
+			if correct {
+				resultStatus = "correct"
+			}
+			s.logger.Printf("game result: %s %s %d-%d -> predicted %s, %s",
+				p.Opponent, actual, gr.RockiesScore, gr.OppScore, p.Predicted, resultStatus)
+
+			record := fmt.Sprintf("Season: %d/%d correct",
+				s.predHistory.CorrectCount(), s.predHistory.TotalCount())
+
+			score := fmt.Sprintf("Rockies %d - %d %s",
+				gr.RockiesScore, gr.OppScore, p.Opponent)
+
+			if err := s.postFollowUp(p.PostURI, correct, score, record); err != nil {
+				s.logger.Printf("warning: could not post follow-up: %v", err)
+			}
+			break
+		}
+	}
+
+	if !found {
+		s.logger.Printf("no matching prediction for game: %s %d-%d", gr.Opponent, gr.RockiesScore, gr.OppScore)
+	}
+}
+
+func (s *Scheduler) postFollowUp(parentURI string, correct bool, score, record string) error {
+	outcome := "Rockies L"
+	if correct {
+		outcome = "Rockies W"
+	}
+
+	text := formatter.FormatFollowUp(formatter.FollowUp{
+		Outcome: outcome,
+		Score:   score,
+		Correct: correct,
+		Record:  record,
+	})
+
+	_, err := s.poster.Reply(text, nil, parentURI, parentURI)
+	if err != nil {
+		return fmt.Errorf("posting follow-up: %w", err)
+	}
+
+	s.logger.Println("posted follow-up!")
+	return nil
+}
+
 func (s *Scheduler) getOpponentPitcher(game *mlb.Game) *mlb.PitcherStats {
 	op := game.OpponentPitcher()
 	if op == nil {
@@ -298,10 +509,6 @@ func (s *Scheduler) nextCheckTime() time.Time {
 	now := s.now().In(denver)
 	tomorrow := now.AddDate(0, 0, 1)
 	return time.Date(tomorrow.Year(), tomorrow.Month(), tomorrow.Day(), 5, 0, 0, 0, denver)
-}
-
-func (s *Scheduler) Tick() error {
-	return s.tick()
 }
 
 func (s *Scheduler) RunOnce() error {

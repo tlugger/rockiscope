@@ -8,10 +8,10 @@ On off-days, it posts the horoscope with a season stats summary because even whe
 
 ## 🧠 The Prediction Engine
 
-Real stats provide the foundation, but the horoscope tips the scales. Honestly the horoscope is probably more reliable than the Rockies' bullpen most nights:
+Real stats provide the foundation, but the horoscope tips the scales. The engine weighs multiple factors and learns from its mistakes over time:
 
-| Factor | Weight | What it uses |
-|--------|--------|-------------|
+| Factor | Starting Weight | What it uses |
+|--------|--------------|-------------|
 | Team win rate | 30% | Season record from MLB standings |
 | Pitcher matchup | 30% | ERA + WHIP: our starter vs theirs |
 | Head-to-head | 15% | Season series record vs today's opponent |
@@ -19,7 +19,23 @@ Real stats provide the foundation, but the horoscope tips the scales. Honestly t
 | Streak momentum | 5% | Current W/L streak |
 | 🔮 Horoscope | 10% | The stars speak via SHA-256 hash of the daily reading |
 
-Early in the season when data is thin, available factors get re-weighted and the stars hold more power. By August, when the Rockies are 20 games back as is tradition, the model has plenty of data to confidently predict more losses.
+### 🎯 Dynamic Weights
+
+The prediction engine learns from its mistakes. After each game:
+1. Records the prediction + actual result to `prediction_history.json`
+2. Calculates which factors "pointed" the right direction over the last 10 games
+3. Adjusts factor weights ±3% toward better-performing factors
+4. Clamps weights to prevent any single factor from dominating (>45%) or disappearing (<2%)
+
+Weights start at the values above but shift over time based on what's actually predicting correctly. On first run, the bot starts fresh — weights adjust as the season progresses. After 10+ games, the model begins dynamically optimizing.
+
+### 🔄 Follow-up Posts
+
+After each game, Rockiscope posts a follow-up reply with the result:
+- **Correct prediction**: "The cosmos don't miss. ✨ Rockies W 4-3. Season: 7/10 correct"
+- **Wrong**: "Called it. (I wasn't.) Rockies L 7-3. Season: 6/10 correct"
+
+This keeps the bot "real-time" and provides accountability for the predictions. Each follow-up includes the running season record.
 
 ## 📡 CLI
 

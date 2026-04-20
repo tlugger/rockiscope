@@ -38,6 +38,7 @@ type refObj struct {
 // Poster is the interface for posting to social media.
 type Poster interface {
 	Post(text string, image *ImageData) (*PostRef, error)
+	Reply(text string, image *ImageData, parentURI, rootURI string) (*PostRef, error)
 }
 
 // Client posts to Bluesky via the AT Protocol XRPC API.
@@ -100,10 +101,17 @@ func (c *Client) Post(text string, image *ImageData) (*PostRef, error) {
 	if err := c.Authenticate(); err != nil {
 		return nil, err
 	}
-	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image)
+	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, nil, nil)
 }
 
-func (c *Client) createRecord(url, text string, image *ImageData) (*PostRef, error) {
+func (c *Client) Reply(text string, image *ImageData, parentURI, rootURI string) (*PostRef, error) {
+	if err := c.Authenticate(); err != nil {
+		return nil, err
+	}
+	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, &parentURI, &rootURI)
+}
+
+func (c *Client) createRecord(url, text string, image *ImageData, parentURI, rootURI *string) (*PostRef, error) {
 	if c.accessJwt == "" || c.did == "" {
 		return nil, fmt.Errorf("not authenticated — call Authenticate() first")
 	}
@@ -131,6 +139,21 @@ func (c *Client) createRecord(url, text string, image *ImageData) (*PostRef, err
 					},
 				},
 			},
+		}
+	}
+
+	if parentURI != nil && *parentURI != "" {
+		rec["reply"] = map[string]interface{}{
+			"parent": map[string]interface{}{
+				"uri":  *parentURI,
+				"cid": "placeholder",
+			},
+			"root": func() string {
+				if rootURI != nil && *rootURI != "" {
+					return *rootURI
+				}
+				return *parentURI
+			}(),
 		}
 	}
 
@@ -213,6 +236,20 @@ type DryRunPoster struct {
 }
 
 func (d *DryRunPoster) Post(text string, image *ImageData) (*PostRef, error) {
+	d.seq++
+	if d.OnPost != nil {
+		d.OnPost(text)
+	}
+	if d.OnImage != nil && image != nil {
+		d.OnImage(image.Bytes)
+	}
+	return &PostRef{
+		URI: fmt.Sprintf("at://dry-run/app.bsky.feed.post/%d", d.seq),
+		CID: fmt.Sprintf("dry-run-cid-%d", d.seq),
+	}, nil
+}
+
+func (d *DryRunPoster) Reply(text string, image *ImageData, parentURI, rootURI string) (*PostRef, error) {
 	d.seq++
 	if d.OnPost != nil {
 		d.OnPost(text)

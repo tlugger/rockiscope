@@ -73,4 +73,5 @@ type GameProvider interface {
 	GetTeamRecord() (*TeamRecord, error)
 	GetPitcherStats(playerID int) (*PitcherStats, error)
 	GetHeadToHead(opponentID int) (*H2HRecord, error)
+	GetGamesSince(date string) ([]GameResult, error)
 }
