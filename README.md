@@ -2,7 +2,7 @@
 
 A Bluesky bot that posts daily horoscopes and win/loss predictions for the Colorado Rockies — a team that has given its fans almost nothing but pain since 2018, yet here we are, building software for them.
 
-Born on July 5, 1991, the Rockies are a Cancer. This tracks. Every game day, Rockiscope scrapes the daily Cancer horoscope, pulls live stats from the MLB API, runs everything through a prediction engine where the stars get the final say, and posts the result to Bluesky — one hour before first pitch.
+Born on July 5, 1991, the Rockies are a Cancer. Every game day, Rockiscope scrapes the daily Cancer horoscope, pulls live stats from the MLB API, runs everything through a prediction engine where the stars get the final say, and posts the result to Bluesky — one hour before first pitch.
 
 On off-days, it posts the horoscope with a season stats summary because even when they're not playing, you're still thinking about them. 🔮
 
