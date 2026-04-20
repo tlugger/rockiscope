@@ -28,8 +28,9 @@ Commands:
   version      Print version
 
 Environment:
-  BLUESKY_USERNAME   Bluesky handle (e.g. yourname.bsky.social)
-  BLUESKY_PASSWORD   Bluesky app password
+  BLUESKY_USERNAME    Bluesky handle (e.g. yourname.bsky.social)
+  BLUESKY_PASSWORD    Bluesky app password
+  ROCKISCOPE_DATA_DIR Directory for persisted data (default: current dir)
 `
 
 func main() {
@@ -160,12 +161,25 @@ func cmdTestHoro(logger *log.Logger) {
 }
 
 func newScheduler(logger *log.Logger, poster bluesky.Poster) *scheduler.Scheduler {
+	dataDir := getDataDir()
 	return scheduler.New(scheduler.Config{
 		MLB:       mlb.NewClient(nil),
 		Horoscope: horoscope.NewScraper(nil),
 		Poster:    poster,
 		Logger:    logger,
+		DataDir:   dataDir,
 	})
+}
+
+func getDataDir() string {
+	if dir := os.Getenv("ROCKISCOPE_DATA_DIR"); dir != "" {
+		return dir
+	}
+	cwd, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return cwd
 }
 
 func mustAuthBluesky(logger *log.Logger) bluesky.Poster {

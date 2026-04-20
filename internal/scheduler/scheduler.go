@@ -3,6 +3,8 @@ package scheduler
 import (
 	"fmt"
 	"log"
+	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/tlugger/rockiscope/internal/bluesky"
@@ -20,6 +22,7 @@ type Scheduler struct {
 	now       func() time.Time
 	sleep     func(time.Duration)
 	logger    *log.Logger
+	dataDir   string
 
 	lastPostDate string
 }
@@ -29,17 +32,66 @@ type Config struct {
 	Horoscope horoscope.Provider
 	Poster    bluesky.Poster
 	Logger    *log.Logger
+	DataDir   string
 }
 
 func New(cfg Config) *Scheduler {
-	return &Scheduler{
+	s := &Scheduler{
 		mlb:       cfg.MLB,
 		horoscope: cfg.Horoscope,
 		poster:    cfg.Poster,
 		now:       time.Now,
 		sleep:     time.Sleep,
 		logger:    cfg.Logger,
+		dataDir:   cfg.DataDir,
 	}
+	loadLastPostDate(s)
+	return s
+}
+
+func (s *Scheduler) lastPostDateFile() string {
+	return filepath.Join(s.dataDir, "last_post_date")
+}
+
+func loadLastPostDate(s *Scheduler) {
+	denver := mlb.DenverLocation()
+	today := s.now().In(denver).Format("2006-01-02")
+
+	if s.dataDir == "" {
+		s.logger.Println("no data dir configured, defaulting to today's date")
+		s.lastPostDate = today
+		return
+	}
+
+	data, err := os.ReadFile(s.lastPostDateFile())
+	if err != nil {
+		if os.IsNotExist(err) {
+			s.logger.Println("no last post date found, defaulting to today's date")
+		} else {
+			s.logger.Printf("warning: could not read last post date: %v", err)
+		}
+		s.lastPostDate = today
+		return
+	}
+	s.lastPostDate = string(data)
+	s.logger.Printf("loaded last post date: %s", s.lastPostDate)
+}
+
+func saveLastPostDate(s *Scheduler) error {
+	if s.dataDir == "" {
+		s.logger.Println("no data dir configured, not saving")
+		return nil
+	}
+
+	if err := os.MkdirAll(s.dataDir, 0755); err != nil {
+		return fmt.Errorf("creating data dir: %w", err)
+	}
+
+	if err := os.WriteFile(s.lastPostDateFile(), []byte(s.lastPostDate), 0644); err != nil {
+		return fmt.Errorf("saving last post date: %w", err)
+	}
+	s.logger.Printf("saved last post date: %s", s.lastPostDate)
+	return nil
 }
 
 func (s *Scheduler) Run() {
@@ -102,6 +154,9 @@ func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
 	}
 
 	s.lastPostDate = today
+	if err := saveLastPostDate(s); err != nil {
+		s.logger.Printf("warning: could not save last post date: %v", err)
+	}
 	return nil
 }
 
@@ -124,6 +179,9 @@ func (s *Scheduler) handleOffDay(today string) error {
 	}
 
 	s.lastPostDate = today
+	if err := saveLastPostDate(s); err != nil {
+		s.logger.Printf("warning: could not save last post date: %v", err)
+	}
 	return nil
 }
 
