@@ -66,6 +66,7 @@ func main() {
 }
 
 func cmdRun(logger *log.Logger) {
+	logger.Printf("starting rockiscope %s", version)
 	poster := mustAuthBluesky(logger)
 	sched := newScheduler(logger, poster)
 	sched.Run()
