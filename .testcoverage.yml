@@ -1,0 +1,8 @@
+profile: cover.out
+threshold:
+  total: 60
+  package: 60
+exclude:
+  paths:
+    - \.pb\.go$
+    - _test\.go$

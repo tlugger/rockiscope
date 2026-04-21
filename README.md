@@ -1,5 +1,10 @@
 # ⚾ Rockiscope
 
+[![test](https://github.com/tlugger/rockiscope/actions/workflows/test.yml/badge.svg)](https://github.com/tlugger/rockiscope/actions/workflows/test.yml)
+[![coverage](https://img.shields.io/badge/coverage-75%25-yellow)](.testcoverage.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/tlugger/rockiscope)](https://goreportcard.com/report/github.com/tlugger/rockiscope)
+[![Release](https://img.shields.io/github/release/tlugger/rockiscope)](https://github.com/tlugger/rockiscope/releases/latest)
+
 A Bluesky bot that posts daily horoscopes and win/loss predictions for the Colorado Rockies — a team that has given its fans almost nothing but pain since 2018, yet here we are, building software for them.
 
 Born on July 5, 1991, the Rockies are a Cancer. Every game day, Rockiscope scrapes the daily Cancer horoscope, pulls live stats from the MLB API, runs everything through a prediction engine where the stars get the final say, and posts the result to Bluesky — one hour before first pitch.
