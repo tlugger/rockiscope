@@ -2,3 +2,4 @@
 rockiscope
 *.log
 sample_card.png
+prediction_history.json
