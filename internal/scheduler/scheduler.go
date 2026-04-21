@@ -16,16 +16,17 @@ import (
 )
 
 type Scheduler struct {
-	mlb       mlb.GameProvider
-	horoscope horoscope.Provider
-	poster    bluesky.Poster
-	now       func() time.Time
-	sleep     func(time.Duration)
-	logger    *log.Logger
-	dataDir   string
+	mlb        mlb.GameProvider
+	horoscope  horoscope.Provider
+	poster     bluesky.Poster
+	now        func() time.Time
+	sleep      func(time.Duration)
+	logger     *log.Logger
+	dataDir    string
 
-	lastPostDate  string
-	predHistory *prediction.PredictionHistory
+	lastPostDate   string
+	lastReplyDate string
+	predHistory   *prediction.PredictionHistory
 }
 
 type Config struct {
@@ -47,6 +48,7 @@ func New(cfg Config) *Scheduler {
 		dataDir:   cfg.DataDir,
 	}
 	loadLastPostDate(s)
+	loadLastReplyDate(s)
 	loadPredictionHistory(s)
 	return s
 }
@@ -93,6 +95,50 @@ func saveLastPostDate(s *Scheduler) error {
 		return fmt.Errorf("saving last post date: %w", err)
 	}
 	s.logger.Printf("saved last post date: %s", s.lastPostDate)
+	return nil
+}
+
+func (s *Scheduler) lastReplyDateFile() string {
+	return filepath.Join(s.dataDir, "last_reply_date")
+}
+
+func loadLastReplyDate(s *Scheduler) {
+	denver := mlb.DenverLocation()
+	today := s.now().In(denver).Format("2006-01-02")
+
+	if s.dataDir == "" {
+		s.lastReplyDate = today
+		return
+	}
+
+	data, err := os.ReadFile(s.lastReplyDateFile())
+	if err != nil {
+		if os.IsNotExist(err) {
+			s.logger.Println("no last reply date found")
+		} else {
+			s.logger.Printf("warning: could not read last reply date: %v", err)
+		}
+		s.lastReplyDate = ""
+		return
+	}
+	s.lastReplyDate = string(data)
+	s.logger.Printf("loaded last reply date: %s", s.lastReplyDate)
+}
+
+func saveLastReplyDate(s *Scheduler) error {
+	if s.dataDir == "" {
+		s.logger.Println("no data dir configured, not saving")
+		return nil
+	}
+
+	if err := os.MkdirAll(s.dataDir, 0755); err != nil {
+		return fmt.Errorf("creating data dir: %w", err)
+	}
+
+	if err := os.WriteFile(s.lastReplyDateFile(), []byte(s.lastReplyDate), 0644); err != nil {
+		return fmt.Errorf("saving last reply date: %w", err)
+	}
+	s.logger.Printf("saved last reply date: %s", s.lastReplyDate)
 	return nil
 }
 
@@ -156,20 +202,66 @@ func (s *Scheduler) tick() error {
 	denver := mlb.DenverLocation()
 	today := s.now().In(denver).Format("2006-01-02")
 
-	if today == s.lastPostDate {
-		s.logger.Println("already posted today, skipping")
-		return nil
-	}
-
 	game, err := s.mlb.GetTodayGame()
 	if err != nil {
 		return fmt.Errorf("fetching today's game: %w", err)
 	}
 
 	if game != nil {
-		return s.handleGameDay(game, today)
+		isFinal := game.Status == "Final"
+
+		if isFinal && s.lastReplyDate != today {
+			s.logger.Println("game is final, posting reply...")
+			return s.handleGameReply(game, today)
+		}
+
+		if s.lastPostDate != today {
+			return s.handleGameDay(game, today)
+		}
+
+		s.logger.Printf("already posted today (waiting for final)")
+		return nil
 	}
-	return s.handleOffDay(today)
+
+	if s.lastPostDate != today {
+		return s.handleOffDay(today)
+	}
+
+	s.logger.Println("already posted today, skipping")
+	return nil
+}
+
+func (s *Scheduler) handleGameReply(game *mlb.Game, today string) error {
+	denver := mlb.DenverLocation()
+	todayDate := s.now().In(denver).Format("2006-01-02")
+
+	s.logger.Println("checking completed games...")
+
+	games, err := s.mlb.GetGamesSince(s.lastPostDate)
+	if err != nil {
+		return fmt.Errorf("fetching completed games: %w", err)
+	}
+
+	for _, gr := range games {
+		s.processCompletedGame(gr, todayDate)
+	}
+
+	hasPendingReply := false
+	for _, p := range s.predHistory.Predictions {
+		if p.Actual != "" && p.PostURI != "" && p.Date == todayDate {
+			hasPendingReply = true
+			break
+		}
+	}
+
+	if hasPendingReply {
+		s.lastReplyDate = todayDate
+		if err := saveLastReplyDate(s); err != nil {
+			s.logger.Printf("warning: could not save reply date: %v", err)
+		}
+	}
+
+	return nil
 }
 
 func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
