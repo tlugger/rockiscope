@@ -38,7 +38,7 @@ Weights start at the values above but shift over time based on what's actually p
 
 After each game, Rockiscope posts a follow-up reply with the result:
 - **Correct prediction**: "The cosmos don't miss. ✨ Rockies W 4-3. Season: 7/10 correct"
-- **Wrong**: ""Trust the stars. Never trust the bullpen. ⭐" Rockies L 7-3. Season: 6/10 correct"
+- **Wrong**: "Trust the stars. Never trust the bullpen. ⭐ Rockies L 7-3. Season: 6/10 correct"
 
 This keeps the bot "real-time" and provides accountability for the predictions. Each follow-up includes the running season record.
 
