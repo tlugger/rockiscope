@@ -3,7 +3,7 @@ threshold:
   total: 50
   package: 40
 override:
-  - path: ^main$
+  - path: ^main\.go$
     threshold: 0
 exclude:
   paths:
