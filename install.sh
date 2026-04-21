@@ -167,6 +167,7 @@ Wants=network-online.target
 Type=simple
 WorkingDirectory=$INSTALL_DIR
 EnvironmentFile=$INSTALL_DIR/.env
+Environment="ROCKISCOPE_DATA_DIR=$INSTALL_DIR"
 ExecStart=$INSTALL_DIR/rockiscope
 Restart=always
 RestartSec=30
