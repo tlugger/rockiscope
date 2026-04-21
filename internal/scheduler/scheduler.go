@@ -132,10 +132,25 @@ func (s *Scheduler) Run() {
 	s.logger.Println("rockiscope scheduler started")
 
 	for {
+		s.logger.Println("checking for completed games...")
+		if err := s.checkForCompletedGames(); err != nil {
+			s.logger.Printf("warning: could not check completed games: %v", err)
+		}
+
 		err := s.tick()
 		if err != nil {
 			s.logger.Printf("error: %v", err)
 		}
+
+		nextCheck := s.nextCheckTime()
+		sleepDur := nextCheck.Sub(s.now())
+		if sleepDur < 1*time.Minute {
+			sleepDur = 1*time.Minute
+		}
+		s.logger.Printf("sleeping until %s (%s)", nextCheck.Format("2006-01-02 15:04 MST"), sleepDur.Round(time.Minute))
+		s.sleep(sleepDur)
+	}
+}
 
 		nextCheck := s.nextCheckTime()
 		sleepDur := nextCheck.Sub(s.now())
