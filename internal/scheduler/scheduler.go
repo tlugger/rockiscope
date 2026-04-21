@@ -188,14 +188,30 @@ func (s *Scheduler) Run() {
 			s.logger.Printf("error: %v", err)
 		}
 
-		nextCheck := s.nextCheckTime()
-		sleepDur := nextCheck.Sub(s.now())
-		if sleepDur < 1*time.Minute {
-			sleepDur = 1*time.Minute
-		}
-		s.logger.Printf("sleeping until %s (%s)", nextCheck.Format("2006-01-02 15:04 MST"), sleepDur.Round(time.Minute))
+		sleepDur := s.calculateSleepDuration()
+		s.logger.Printf("sleeping for %s", sleepDur.Round(time.Minute))
 		s.sleep(sleepDur)
 	}
+}
+
+func (s *Scheduler) calculateSleepDuration() time.Duration {
+	denver := mlb.DenverLocation()
+	now := s.now().In(denver)
+	today := now.Format("2006-01-02")
+
+	if s.lastPostDate == today && s.lastReplyDate != today {
+		game, err := s.mlb.GetTodayGame()
+		if err == nil && game != nil && game.Status != "Final" {
+			return 30 * time.Minute
+		}
+	}
+
+	nextCheck := s.nextCheckTime()
+	sleepDur := nextCheck.Sub(now)
+	if sleepDur < 1*time.Minute {
+		sleepDur = 1 * time.Minute
+	}
+	return sleepDur
 }
 
 func (s *Scheduler) tick() error {
