@@ -1,0 +1,79 @@
+name: release
+
+on:
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Branch to release from
+        required: true
+        type: string
+        default: main
+      version:
+        description: Version tag (e.g., v0.5.0)
+        required: true
+        type: string
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.inputs.branch }}
+          fetch-depth: 0
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Build linux/arm64
+        env:
+          GOOS: linux
+          GOARCH: arm64
+        run: go build -o rockiscope-linux-arm64 .
+
+      - name: Build linux/amd64
+        env:
+          GOOS: linux
+          GOARCH: amd64
+        run: go build -o rockiscope-linux-amd64 .
+
+      - name: Build linux/arm
+        env:
+          GOOS: linux
+          GOARCH: arm
+        run: go build -o rockiscope-linux-arm .
+
+      - name: Create binary checksums
+        run: |
+          sha256sum rockiscope-linux-arm64 > rockiscope-linux-arm64.sha256
+          sha256sum rockiscope-linux-amd64 > rockiscope-linux-amd64.sha256
+          sha256sum rockiscope-linux-arm > rockiscope-linux-arm.sha256
+
+      - name: Delete existing tag if exists
+        run: |
+          git tag -d ${{ github.event.inputs.version }} || true
+          git push --delete origin ${{ github.event.inputs.version }} || true
+
+      - name: Create tag
+        run: git tag ${{ github.event.inputs.version }}
+
+      - name: Push tag
+        run: git push origin ${{ github.event.inputs.version }}
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.version }}
+          generate_release_notes: true
+          files: |
+            rockiscope-linux-arm64
+            rockiscope-linux-arm64.sha256
+            rockiscope-linux-amd64
+            rockiscope-linux-amd64.sha256
+            rockiscope-linux-arm
+            rockiscope-linux-arm.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
