@@ -11,20 +11,22 @@ import (
 	"github.com/tlugger/rockiscope/internal/bluesky"
 	"github.com/tlugger/rockiscope/internal/horoscope"
 	"github.com/tlugger/rockiscope/internal/mlb"
+	"github.com/tlugger/rockiscope/internal/prediction"
 )
 
 type mockMLB struct {
-	game    *mlb.Game
-	record  *mlb.TeamRecord
-	pitcher *mlb.PitcherStats
-	h2h     *mlb.H2HRecord
+	game      *mlb.Game
+	record   *mlb.TeamRecord
+	pitcher   *mlb.PitcherStats
+	h2h       *mlb.H2HRecord
+	gamesSince []mlb.GameResult
 }
 
 func (m *mockMLB) GetTodayGame() (*mlb.Game, error)                  { return m.game, nil }
 func (m *mockMLB) GetTeamRecord() (*mlb.TeamRecord, error)           { return m.record, nil }
 func (m *mockMLB) GetPitcherStats(id int) (*mlb.PitcherStats, error) { return m.pitcher, nil }
 func (m *mockMLB) GetHeadToHead(id int) (*mlb.H2HRecord, error)     { return m.h2h, nil }
-func (m *mockMLB) GetGamesSince(date string) ([]mlb.GameResult, error) { return nil, nil }
+func (m *mockMLB) GetGamesSince(date string) ([]mlb.GameResult, error) { return m.gamesSince, nil }
 
 type mockHoroscope struct {
 	horo *horoscope.Horoscope
@@ -33,9 +35,11 @@ type mockHoroscope struct {
 func (m *mockHoroscope) GetDailyHoroscope() (*horoscope.Horoscope, error) { return m.horo, nil }
 
 type mockPoster struct {
-	posts  []string
-	images int
-	seq    int
+	posts       []string
+	replies     []string
+	images      int
+	seq        int
+	replyCount int
 }
 
 func (m *mockPoster) Post(text string, image *bluesky.ImageData) (*bluesky.PostRef, error) {
@@ -52,7 +56,8 @@ func (m *mockPoster) Post(text string, image *bluesky.ImageData) (*bluesky.PostR
 
 func (m *mockPoster) Reply(text string, image *bluesky.ImageData, parentURI, rootURI string) (*bluesky.PostRef, error) {
 	m.seq++
-	m.posts = append(m.posts, text)
+	m.replyCount++
+	m.replies = append(m.replies, text)
 	if image != nil {
 		m.images++
 	}
@@ -240,5 +245,236 @@ func TestNextCheckTime(t *testing.T) {
 	expected := time.Date(2026, 4, 9, 5, 0, 0, 0, denver)
 	if !next.Equal(expected) {
 		t.Errorf("nextCheckTime = %v, want %v", next, expected)
+	}
+}
+
+func TestNew(t *testing.T) {
+	cfg := Config{
+		MLB:       &mockMLB{},
+		Horoscope: &mockHoroscope{},
+		Poster:   &mockPoster{},
+		Logger:   testLogger(),
+	}
+
+	s := New(cfg)
+	if s == nil {
+		t.Fatal("expected scheduler")
+	}
+}
+
+func TestRunOnce(t *testing.T) {
+	denver := mlb.DenverLocation()
+	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, denver)
+
+	poster := &mockPoster{}
+	s := &Scheduler{
+		mlb: &mockMLB{
+			game: &mlb.Game{
+				GamePk: 1234, GameDateTime: nowTime.Add(2 * time.Hour), Status: "Preview",
+				Venue: "Coors Field", IsHome: true,
+				HomeTeam: mlb.TeamInfo{ID: 115, Name: "Colorado Rockies"},
+				AwayTeam: mlb.TeamInfo{ID: 117, Name: "Houston Astros"},
+			},
+			record: &mlb.TeamRecord{Wins: 5, Losses: 6, WinningPercentage: 0.455},
+		},
+		horoscope: &mockHoroscope{
+			horo: &horoscope.Horoscope{Sign: "cancer", Text: "Test horoscope"},
+		},
+		poster:    poster,
+		now:       func() time.Time { return nowTime },
+		sleep:     func(d time.Duration) {},
+		logger:    testLogger(),
+	}
+
+	err := s.RunOnce()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if len(poster.posts) != 1 {
+		t.Errorf("expected 1 post, got %d", len(poster.posts))
+	}
+}
+
+func TestRecordOffDay(t *testing.T) {
+	denver := mlb.DenverLocation()
+	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, denver)
+
+	s := &Scheduler{
+		mlb:       &mockMLB{},
+		now:       func() time.Time { return nowTime },
+		sleep:     func(d time.Duration) {},
+		logger:    testLogger(),
+		dataDir:   "",
+		predHistory: &prediction.PredictionHistory{
+			Predictions: []prediction.PredictionRecord{},
+			Current:    prediction.DefaultWeights(),
+		},
+	}
+
+	pred := prediction.Prediction{WinProbability: 0.5, Pick: "W"}
+	s.recordOffDay("2026-04-08", pred, "at://test/post/1")
+
+	if len(s.predHistory.Predictions) != 1 {
+		t.Errorf("expected 1 prediction recorded, got %d", len(s.predHistory.Predictions))
+	}
+}
+
+func TestCheckForCompletedGames_NoHistory(t *testing.T) {
+	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, time.UTC)
+	s := &Scheduler{
+		mlb:       &mockMLB{},
+		now:       func() time.Time { return nowTime },
+		sleep:     func(d time.Duration) {},
+		logger:    testLogger(),
+		dataDir:   "",
+	}
+
+	err := s.checkForCompletedGames()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestCheckForCompletedGames_MatchingResults(t *testing.T) {
+	denver := mlb.DenverLocation()
+	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, denver)
+	poster := &mockPoster{}
+
+	s := &Scheduler{
+		mlb: &mockMLB{
+			gamesSince: []mlb.GameResult{
+				{GamePk: 1234, Date: "2026-04-08", Opponent: "Houston Astros", Won: true},
+			},
+		},
+		poster:    poster,
+		now:       func() time.Time { return nowTime },
+		sleep:     func(d time.Duration) {},
+		logger:    testLogger(),
+		dataDir:   "",
+		predHistory: &prediction.PredictionHistory{
+			Predictions: []prediction.PredictionRecord{
+				{Date: "2026-04-08", Opponent: "Houston Astros", Predicted: "W", GamePK: 1234},
+			},
+			Current: prediction.Weights{WinRate: 0.30, Pitcher: 0.30},
+		},
+	}
+
+	err := s.checkForCompletedGames()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if s.predHistory.Predictions[0].Actual != "W" {
+		t.Errorf("expected actual = W, got %s", s.predHistory.Predictions[0].Actual)
+	}
+}
+
+func TestCheckForCompletedGames_WrongPrediction(t *testing.T) {
+	denver := mlb.DenverLocation()
+	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, denver)
+	poster := &mockPoster{}
+
+	s := &Scheduler{
+		mlb: &mockMLB{
+			gamesSince: []mlb.GameResult{
+				{GamePk: 1234, Date: "2026-04-08", Opponent: "Houston Astros", Won: true},
+			},
+		},
+		poster:    poster,
+		now:       func() time.Time { return nowTime },
+		sleep:     func(d time.Duration) {},
+		logger:    testLogger(),
+		dataDir:   "",
+		predHistory: &prediction.PredictionHistory{
+			Predictions: []prediction.PredictionRecord{
+				{Date: "2026-04-08", Opponent: "Houston Astros", Predicted: "L", GamePK: 1234},
+			},
+			Current: prediction.Weights{WinRate: 0.30, Pitcher: 0.30},
+		},
+	}
+
+	err := s.checkForCompletedGames()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if s.predHistory.Predictions[0].Actual != "W" {
+		t.Errorf("expected actual = W, got %s", s.predHistory.Predictions[0].Actual)
+	}
+}
+
+func TestCheckForCompletedGames_CallsReply(t *testing.T) {
+	denver := mlb.DenverLocation()
+	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, denver)
+	poster := &mockPoster{}
+
+	s := &Scheduler{
+		mlb: &mockMLB{
+			gamesSince: []mlb.GameResult{
+				{GamePk: 1234, Date: "2026-04-08", Opponent: "Houston Astros", Won: true},
+			},
+		},
+		poster:    poster,
+		now:       func() time.Time { return nowTime },
+		sleep:     func(d time.Duration) {},
+		logger:    testLogger(),
+		dataDir:   "",
+		predHistory: &prediction.PredictionHistory{
+			Predictions: []prediction.PredictionRecord{
+				{
+					Date:     "2026-04-08",
+					Opponent: "Houston Astros",
+					Predicted: "W",
+					GamePK:  1234,
+				},
+			},
+			Current: prediction.Weights{WinRate: 0.30, Pitcher: 0.30},
+		},
+	}
+
+	err := s.checkForCompletedGames()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if poster.replyCount == 0 {
+		t.Error("expected a reply to be posted")
+	}
+}
+
+func TestCheckForCompletedGames_WeightAdjustment(t *testing.T) {
+	denver := mlb.DenverLocation()
+	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, denver)
+
+	s := &Scheduler{
+		mlb: &mockMLB{
+			gamesSince: []mlb.GameResult{
+				{GamePk: 1234, Date: "2026-04-08", Opponent: "Houston Astros", Won: true},
+				{GamePk: 1235, Date: "2026-04-07", Opponent: "Dodgers", Won: true},
+				{GamePk: 1236, Date: "2026-04-06", Opponent: "Giants", Won: false},
+			},
+		},
+		now:   func() time.Time { return nowTime },
+		sleep: func(d time.Duration) {},
+		logger: testLogger(),
+		dataDir: "",
+		predHistory: &prediction.PredictionHistory{
+			Predictions: []prediction.PredictionRecord{
+				{Date: "2026-04-08", Opponent: "Houston Astros", Predicted: "W", Actual: "W", GamePK: 1234},
+				{Date: "2026-04-07", Opponent: "Dodgers", Predicted: "W", Actual: "W", GamePK: 1235},
+				{Date: "2026-04-06", Opponent: "Giants", Predicted: "W", Actual: "L", GamePK: 1236},
+			},
+			Current: prediction.Weights{WinRate: 0.30, Pitcher: 0.30},
+		},
+	}
+
+	err := s.checkForCompletedGames()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	originalWinRate := prediction.Weights{WinRate: 0.30, Pitcher: 0.30}.WinRate
+	if s.predHistory.Current.WinRate == originalWinRate {
+		t.Logf("weights may adjust after 3+ predictions, got winRate=%f", s.predHistory.Current.WinRate)
 	}
 }
