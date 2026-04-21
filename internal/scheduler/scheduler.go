@@ -201,7 +201,18 @@ func (s *Scheduler) calculateSleepDuration() time.Duration {
 
 	if s.lastPostDate == today && s.lastReplyDate != today {
 		game, err := s.mlb.GetTodayGame()
-		if err == nil && game != nil && game.Status != "Final" {
+		if err == nil && game != nil {
+			if game.Status == "Final" {
+				return 1 * time.Minute
+			}
+			gameTime := now
+			if game.GameDateTime.After(now) {
+				gameTime = game.GameDateTime.In(denver)
+			}
+			wakeTime := gameTime.Add(30 * time.Minute)
+			if wakeTime.After(now) {
+				return wakeTime.Sub(now)
+			}
 			return 30 * time.Minute
 		}
 	}
