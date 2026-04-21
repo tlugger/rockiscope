@@ -145,15 +145,18 @@ func (c *Client) createRecord(url, text string, image *ImageData, parentURI, roo
 	if parentURI != nil && *parentURI != "" {
 		rec["reply"] = map[string]interface{}{
 			"parent": map[string]interface{}{
-				"uri":  *parentURI,
+				"uri": *parentURI,
 				"cid": "placeholder",
 			},
-			"root": func() string {
-				if rootURI != nil && *rootURI != "" {
-					return *rootURI
-				}
-				return *parentURI
-			}(),
+			"root": map[string]interface{}{
+				"uri": func() string {
+					if rootURI != nil && *rootURI != "" {
+						return *rootURI
+					}
+					return *parentURI
+				}(),
+				"cid": "placeholder",
+			},
 		}
 	}
 

@@ -171,3 +171,69 @@ func TestDryRunPoster(t *testing.T) {
 		t.Errorf("expected 1 post, got %d", len(posts))
 	}
 }
+
+func TestReply_ReplyRecordStructure(t *testing.T) {
+	var rec map[string]interface{}
+	ts := mockBlueskyServer(t, func(body map[string]interface{}) {
+		rec = body["record"].(map[string]interface{})
+	})
+	defer ts.Close()
+
+	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test"}
+	parentURI := "at://did:plc:abc123/app.bsky.feed.post/parent123"
+	rootURI := "at://did:plc:abc123/app.bsky.feed.post/root456"
+
+	_, err := c.Reply("reply text", nil, parentURI, rootURI)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	reply, ok := rec["reply"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected reply field in record")
+	}
+
+	parent, ok := reply["parent"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected parent as object")
+	}
+	if parent["uri"] != parentURI {
+		t.Errorf("parent.uri = %q, want %q", parent["uri"], parentURI)
+	}
+	if _, ok := parent["cid"]; !ok {
+		t.Error("expected parent.cid")
+	}
+
+	root, ok := reply["root"].(map[string]interface{})
+	if !ok {
+		t.Fatal("expected root as object, got string")
+	}
+	if root["uri"] != rootURI {
+		t.Errorf("root.uri = %q, want %q", root["uri"], rootURI)
+	}
+	if _, ok := root["cid"]; !ok {
+		t.Error("expected root.cid")
+	}
+}
+
+func TestReply_UsesParentAsRoot(t *testing.T) {
+	var rec map[string]interface{}
+	ts := mockBlueskyServer(t, func(body map[string]interface{}) {
+		rec = body["record"].(map[string]interface{})
+	})
+	defer ts.Close()
+
+	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test"}
+	parentURI := "at://did:plc:abc123/app.bsky.feed.post/parent123"
+
+	_, err := c.Reply("reply text", nil, parentURI, "")
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	reply := rec["reply"].(map[string]interface{})
+	root := reply["root"].(map[string]interface{})
+	if root["uri"] != parentURI {
+		t.Errorf("root.uri = %q, want %q (defaults to parentURI)", root["uri"], parentURI)
+	}
+}
