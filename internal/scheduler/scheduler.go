@@ -152,16 +152,6 @@ func (s *Scheduler) Run() {
 	}
 }
 
-		nextCheck := s.nextCheckTime()
-		sleepDur := nextCheck.Sub(s.now())
-		if sleepDur < 1*time.Minute {
-			sleepDur = 1 * time.Minute
-		}
-		s.logger.Printf("sleeping until %s (%s)", nextCheck.Format("2006-01-02 15:04 MST"), sleepDur.Round(time.Minute))
-		s.sleep(sleepDur)
-	}
-}
-
 func (s *Scheduler) tick() error {
 	denver := mlb.DenverLocation()
 	today := s.now().In(denver).Format("2006-01-02")
