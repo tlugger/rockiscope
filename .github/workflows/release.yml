@@ -32,19 +32,19 @@ jobs:
         env:
           GOOS: linux
           GOARCH: arm64
-        run: go build -o rockiscope-linux-arm64 .
+        run: go build -ldflags "-X main.version=${{ github.event.inputs.version }}" -o rockiscope-linux-arm64 .
 
       - name: Build linux/amd64
         env:
           GOOS: linux
           GOARCH: amd64
-        run: go build -o rockiscope-linux-amd64 .
+        run: go build -ldflags "-X main.version=${{ github.event.inputs.version }}" -o rockiscope-linux-amd64 .
 
       - name: Build linux/arm
         env:
           GOOS: linux
           GOARCH: arm
-        run: go build -o rockiscope-linux-arm .
+        run: go build -ldflags "-X main.version=${{ github.event.inputs.version }}" -o rockiscope-linux-arm .
 
       - name: Create binary checksums
         run: |

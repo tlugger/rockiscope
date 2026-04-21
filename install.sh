@@ -134,7 +134,9 @@ else
     (git clone --depth 1 "https://github.com/$REPO.git" "$TMPDIR/rockiscope" 2>/dev/null) &
     spin $! "Cloning repository"
 
-    (cd "$TMPDIR/rockiscope" && go build -o "$INSTALL_DIR/rockiscope" . 2>&1) &
+    VERSION=$(git -C "$TMPDIR/rockiscope" describe --tags --always 2>/dev/null || echo "dev")
+
+    (cd "$TMPDIR/rockiscope" && go build -ldflags "-X main.version=$VERSION" -o "$INSTALL_DIR/rockiscope" . 2>&1) &
     spin $! "Building binary"
 
     chmod +x "$INSTALL_DIR/rockiscope"
