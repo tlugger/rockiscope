@@ -19,8 +19,11 @@ func TestParseHoroscopeHTML(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	if !strings.Contains(text, "Cancer") {
-		t.Errorf("expected horoscope to mention Cancer, got: %s", text)
+	if !strings.Contains(text, "Rockies") {
+		t.Errorf("expected horoscope to mention Rockies, got: %s", text)
+	}
+	if strings.Contains(text, "Cancer") {
+		t.Error("expected Cancer to be replaced with Rockies")
 	}
 	if !strings.Contains(text, "retreat into your bedroom") {
 		t.Errorf("expected specific horoscope text, got: %s", text)
@@ -72,8 +75,8 @@ func TestScraper_GetDailyHoroscope(t *testing.T) {
 	if h.Sign != "cancer" {
 		t.Errorf("sign = %q, want cancer", h.Sign)
 	}
-	if !strings.Contains(h.Text, "Cancer") {
-		t.Errorf("expected Cancer in text, got: %s", h.Text)
+	if !strings.Contains(h.Text, "Rockies") {
+		t.Errorf("expected Rockies in text, got: %s", h.Text)
 	}
 }
 

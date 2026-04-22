@@ -96,6 +96,7 @@ func ParseHoroscopeHTML(html string) (string, error) {
 	text = stripTags(text)
 	text = decodeEntities(text)
 	text = normalizeWhitespace(text)
+	text = strings.ReplaceAll(text, "Cancer", "Rockies")
 
 	if len(text) < 20 {
 		return "", fmt.Errorf("horoscope text too short (%d chars)", len(text))

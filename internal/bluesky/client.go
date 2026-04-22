@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -13,6 +14,16 @@ import (
 type PostRef struct {
 	URI string
 	CID string
+}
+
+// ExtractCID returns the CID from a Bluesky post URI.
+// URI format: at://did:plc:xxx/app.bsky.feed.post/CID
+func ExtractCID(uri string) string {
+	parts := strings.Split(uri, "/")
+	if len(parts) > 0 {
+		return parts[len(parts)-1]
+	}
+	return ""
 }
 
 // ImageData holds a PNG image to attach to a post.
@@ -143,19 +154,25 @@ func (c *Client) createRecord(url, text string, image *ImageData, parentURI, roo
 	}
 
 	if parentURI != nil && *parentURI != "" {
+		parentCID := ExtractCID(*parentURI)
+		rootURIVal := func() string {
+			if rootURI != nil && *rootURI != "" {
+				return *rootURI
+			}
+			return *parentURI
+		}()
+		rootCID := rootURIVal
+		if rootURI == nil || *rootURI == "" {
+			rootCID = parentCID
+		}
 		rec["reply"] = map[string]interface{}{
 			"parent": map[string]interface{}{
-				"uri": *parentURI,
-				"cid": "placeholder",
+				"uri":  *parentURI,
+				"cid":  parentCID,
 			},
 			"root": map[string]interface{}{
-				"uri": func() string {
-					if rootURI != nil && *rootURI != "" {
-						return *rootURI
-					}
-					return *parentURI
-				}(),
-				"cid": "placeholder",
+				"uri": rootURIVal,
+				"cid": rootCID,
 			},
 		}
 	}

@@ -564,8 +564,6 @@ func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) {
 			if gr.Won {
 				actual = "W"
 			}
-			p.Actual = actual
-			found = true
 
 			correct := p.Predicted == actual
 			resultStatus := "wrong"
@@ -583,6 +581,9 @@ func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) {
 
 			if err := s.postFollowUp(p.PostURI, correct, score, record); err != nil {
 				s.logger.Printf("warning: could not post follow-up: %v", err)
+			} else {
+				p.Actual = actual
+				found = true
 			}
 			break
 		}
