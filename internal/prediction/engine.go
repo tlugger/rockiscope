@@ -12,8 +12,9 @@ import (
 // Prediction is the output of the prediction engine.
 type Prediction struct {
 	WinProbability float64
-	Pick           string // "W" or "L"
-	Confidence     string // human-readable confidence descriptor
+	Pick            string // "W" or "L"
+	Confidence      string // human-readable confidence descriptor
+	Factors         map[string]float64
 }
 
 // Input holds all the data the engine needs. Any field can be nil/zero
@@ -40,6 +41,7 @@ const (
 // Predict computes a win probability and pick from the input data.
 // All logic is pure — no I/O, fully deterministic for the same inputs.
 func Predict(in Input) Prediction {
+	factors := make(map[string]float64)
 	totalWeight := 0.0
 	weightedSum := 0.0
 
@@ -47,6 +49,7 @@ func Predict(in Input) Prediction {
 	if in.Record != nil && (in.Record.Wins+in.Record.Losses) > 0 {
 		totalWeight += weightWinRate
 		weightedSum += weightWinRate * in.Record.WinningPercentage
+		factors["winRate"] = in.Record.WinningPercentage
 	}
 
 	// 2. Pitcher matchup factor
@@ -54,6 +57,7 @@ func Predict(in Input) Prediction {
 	if pitcherScore >= 0 {
 		totalWeight += weightPitcher
 		weightedSum += weightPitcher * pitcherScore
+		factors["pitcher"] = pitcherScore
 	}
 
 	// 3. Head-to-head factor
@@ -61,38 +65,44 @@ func Predict(in Input) Prediction {
 		totalWeight += weightH2H
 		h2hPct := float64(in.HeadToHead.Wins) / float64(in.HeadToHead.GamesPlayed)
 		weightedSum += weightH2H * h2hPct
+		factors["h2h"] = h2hPct
 	}
 
 	// 4. Home/away factor
 	if in.Record != nil {
 		totalWeight += weightHomeAway
+		homeAwayScore := 0.54
 		if in.IsHome {
 			homeGames := in.Record.HomeWins + in.Record.HomeLosses
 			if homeGames > 0 {
-				weightedSum += weightHomeAway * float64(in.Record.HomeWins) / float64(homeGames)
-			} else {
-				weightedSum += weightHomeAway * 0.54 // historical MLB home advantage
+				homeAwayScore = float64(in.Record.HomeWins) / float64(homeGames)
 			}
 		} else {
 			awayGames := in.Record.AwayWins + in.Record.AwayLosses
 			if awayGames > 0 {
-				weightedSum += weightHomeAway * float64(in.Record.AwayWins) / float64(awayGames)
+				homeAwayScore = float64(in.Record.AwayWins) / float64(awayGames)
 			} else {
-				weightedSum += weightHomeAway * 0.46
+				homeAwayScore = 0.46
 			}
 		}
+		weightedSum += weightHomeAway * homeAwayScore
+		factors["homeAway"] = homeAwayScore
 	}
 
 	// 5. Momentum factor (streak)
 	if in.Record != nil && in.Record.StreakCode != "" {
 		totalWeight += weightMomentum
-		weightedSum += weightMomentum * streakScore(in.Record.StreakCode)
+		momentumScore := streakScore(in.Record.StreakCode)
+		weightedSum += weightMomentum * momentumScore
+		factors["momentum"] = momentumScore
 	}
 
 	// 6. Horoscope factor — the stars speak
 	if in.HoroscopeText != "" {
 		totalWeight += weightStars
-		weightedSum += weightStars * horoscopeScore(in.HoroscopeText)
+		starsScore := horoscopeScore(in.HoroscopeText)
+		weightedSum += weightStars * starsScore
+		factors["stars"] = starsScore
 	}
 
 	// Normalize
@@ -100,7 +110,6 @@ func Predict(in Input) Prediction {
 	if totalWeight > 0 {
 		prob = weightedSum / totalWeight
 	} else {
-		// No data at all — the stars must decide
 		prob = horoscopeScore(in.HoroscopeText)
 		if prob == 0 {
 			prob = 0.5
@@ -117,8 +126,9 @@ func Predict(in Input) Prediction {
 
 	return Prediction{
 		WinProbability: prob,
-		Pick:           pick,
-		Confidence:     confidenceLabel(prob),
+		Pick:            pick,
+		Confidence:      confidenceLabel(prob),
+		Factors:        factors,
 	}
 }
 

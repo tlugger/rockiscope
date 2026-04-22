@@ -49,6 +49,6 @@ func FormatFollowUp(f FollowUp) string {
 		msg = incorrectMessages[rand.Intn(len(incorrectMessages))]
 	}
 
-	return fmt.Sprintf("%s\n🏁 %s\n\n📊 %s\n\n🎯 %s",
+	return fmt.Sprintf("%s\n\n🏁 %s\n📊 %s\n\n🎯 %s",
 		msg, f.Outcome, f.Score, f.Record)
 }

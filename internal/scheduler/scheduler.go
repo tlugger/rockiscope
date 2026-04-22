@@ -465,6 +465,27 @@ func (s *Scheduler) publish(post formatter.Post) error {
 }
 
 func (s *Scheduler) recordPrediction(date string, game *mlb.Game, pred prediction.Prediction, postURI string) {
+	factors := prediction.FactorScores{}
+	if pred.Factors != nil {
+		if v, ok := pred.Factors["winRate"]; ok {
+			factors.WinRate = v
+		}
+		if v, ok := pred.Factors["pitcher"]; ok {
+			factors.Pitcher = v
+		}
+		if v, ok := pred.Factors["h2h"]; ok {
+			factors.H2H = v
+		}
+		if v, ok := pred.Factors["homeAway"]; ok {
+			factors.HomeAway = v
+		}
+		if v, ok := pred.Factors["momentum"]; ok {
+			factors.Momentum = v
+		}
+		if v, ok := pred.Factors["stars"]; ok {
+			factors.Stars = v
+		}
+	}
 	rec := prediction.PredictionRecord{
 		Date:            date,
 		Opponent:        game.Opponent().Name,
@@ -474,6 +495,7 @@ func (s *Scheduler) recordPrediction(date string, game *mlb.Game, pred predictio
 		PostURI:         postURI,
 		GamePK:          game.GamePk,
 		WinProbability: pred.WinProbability,
+		Factors:       factors,
 	}
 
 	if s.predHistory == nil {
