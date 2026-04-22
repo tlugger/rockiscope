@@ -155,15 +155,11 @@ func (c *Client) createRecord(url, text string, image *ImageData, parentURI, roo
 
 	if parentURI != nil && *parentURI != "" {
 		parentCID := ExtractCID(*parentURI)
-		rootURIVal := func() string {
-			if rootURI != nil && *rootURI != "" {
-				return *rootURI
-			}
-			return *parentURI
-		}()
-		rootCID := rootURIVal
-		if rootURI == nil || *rootURI == "" {
-			rootCID = parentCID
+		rootURIVal := *parentURI
+		rootCID := parentCID
+		if rootURI != nil && *rootURI != "" {
+			rootURIVal = *rootURI
+			rootCID = ExtractCID(*rootURI)
 		}
 		rec["reply"] = map[string]interface{}{
 			"parent": map[string]interface{}{

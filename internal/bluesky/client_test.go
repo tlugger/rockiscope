@@ -173,13 +173,17 @@ func TestDryRunPoster(t *testing.T) {
 }
 
 func TestExtractCID(t *testing.T) {
-	uri := "at://did:plc:abc123/app.bsky.feed.post/bafyre123"
-	want := "bafyre123"
-	if got := ExtractCID(uri); got != want {
-		t.Errorf("ExtractCID(%q) = %q, want %q", uri, got, want)
+	tests := []struct {
+		uri  string
+		want string
+	}{
+		{"at://did:plc:abc123/app.bsky.feed.post/bafyre123", "bafyre123"},
+		{"at://did:plc:qqgwambml7qxpipc6tis5cis/app.bsky.feed.post/3mk25rlmmav2g", "3mk25rlmmav2g"},
+		{"", ""},
 	}
-
-	if got := ExtractCID(""); got != "" {
-		t.Errorf("ExtractCID(empty) = %q, want empty", got)
+	for _, tt := range tests {
+		if got := ExtractCID(tt.uri); got != tt.want {
+			t.Errorf("ExtractCID(%q) = %q, want %q", tt.uri, got, tt.want)
+		}
 	}
 }
