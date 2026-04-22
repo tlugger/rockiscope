@@ -573,13 +573,13 @@ func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) {
 			s.logger.Printf("game result: %s %s %d-%d -> predicted %s, %s",
 				p.Opponent, actual, gr.RockiesScore, gr.OppScore, p.Predicted, resultStatus)
 
-			record := fmt.Sprintf("Season: %d/%d correct",
+			record := fmt.Sprintf("%d/%d correct predictions this season",
 				s.predHistory.CorrectCount(), s.predHistory.TotalCount())
 
-			score := fmt.Sprintf("Rockies %d - %d %s",
+			score := fmt.Sprintf("Colorado Rockies %d-%d %s",
 				gr.RockiesScore, gr.OppScore, p.Opponent)
 
-			if err := s.postFollowUp(p.PostURI, correct, score, record); err != nil {
+			if err := s.postFollowUp(p.PostURI, correct, actual, score, record); err != nil {
 				s.logger.Printf("warning: could not post follow-up: %v", err)
 			} else {
 				p.Actual = actual
@@ -594,11 +594,8 @@ func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) {
 	}
 }
 
-func (s *Scheduler) postFollowUp(parentURI string, correct bool, score, record string) error {
-	outcome := "Rockies L"
-	if correct {
-		outcome = "Rockies W"
-	}
+func (s *Scheduler) postFollowUp(parentURI string, correct bool, actual, score, record string) error {
+	outcome := fmt.Sprintf("Rockies %s", actual)
 
 	text := formatter.FormatFollowUp(formatter.FollowUp{
 		Outcome: outcome,
