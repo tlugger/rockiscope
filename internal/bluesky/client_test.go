@@ -187,3 +187,43 @@ func TestExtractCID(t *testing.T) {
 		}
 	}
 }
+
+func TestGetRecordCID(t *testing.T) {
+	var recordedCID string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+
+		if strings.Contains(r.URL.Path, "createSession") {
+			json.NewEncoder(w).Encode(map[string]string{
+				"accessJwt": "fake-jwt-token",
+				"did":       "did:plc:fake123",
+			})
+			return
+		}
+
+		if strings.Contains(r.URL.Path, "getRecord") {
+			recordedCID = "bafyrei123"
+			json.NewEncoder(w).Encode(map[string]interface{}{
+				"uri":  "at://did:plc:fake123/app.bsky.feed.post/abc123",
+				"cid": "bafyrei123",
+				"value": map[string]interface{}{
+					"$type":     "app.bsky.feed.post",
+					"text":      "test",
+					"createdAt": "2026-04-21T00:00:00Z",
+				},
+			})
+			return
+		}
+		http.NotFound(w, r)
+	}))
+	defer ts.Close()
+
+	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test"}
+	cid, err := c.GetRecordCID("at://did:plc:fake123/app.bsky.feed.post/abc123")
+	if err != nil {
+		t.Fatalf("GetRecordCID error: %v", err)
+	}
+	if cid != recordedCID {
+		t.Errorf("GetRecordCID = %q, want %q", cid, recordedCID)
+	}
+}

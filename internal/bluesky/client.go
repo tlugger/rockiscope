@@ -16,6 +16,46 @@ type PostRef struct {
 	CID string
 }
 
+// GetRecordCID fetches the CID for a post URI.
+func (c *Client) GetRecordCID(uri string) (string, error) {
+	if err := c.Authenticate(); err != nil {
+		return "", err
+	}
+
+	ts := strings.Split(strings.TrimPrefix(uri, "at://"), "/")
+	if len(ts) < 3 {
+		return "", fmt.Errorf("invalid URI: %s", uri)
+	}
+	repo := ts[0]
+	collection := ts[1]
+	rkey := ts[2]
+
+	url := c.baseURL + "/xrpc/com.atproto.repo.getRecord?repo=" + repo + "&collection=" + collection + "&rkey=" + rkey
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return "", fmt.Errorf("creating request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+c.accessJwt)
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return "", fmt.Errorf("fetching record: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return "", fmt.Errorf("getRecord returned status %d", resp.StatusCode)
+	}
+
+	var result struct {
+		CID string `json:"cid"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
+		return "", fmt.Errorf("decoding response: %w", err)
+	}
+	return result.CID, nil
+}
+
 // ExtractCID returns the CID from a Bluesky post URI.
 // URI format: at://did:plc:xxx/app.bsky.feed.post/CID
 func ExtractCID(uri string) string {
@@ -112,17 +152,28 @@ func (c *Client) Post(text string, image *ImageData) (*PostRef, error) {
 	if err := c.Authenticate(); err != nil {
 		return nil, err
 	}
-	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, nil, nil)
+	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, nil, nil, nil, nil)
 }
 
 func (c *Client) Reply(text string, image *ImageData, parentURI, rootURI string) (*PostRef, error) {
 	if err := c.Authenticate(); err != nil {
 		return nil, err
 	}
-	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, &parentURI, &rootURI)
+	parentCID, err := c.GetRecordCID(parentURI)
+	if err != nil {
+		return nil, fmt.Errorf("fetching parent CID: %w", err)
+	}
+	rootCID := parentCID
+	if rootURI != "" && rootURI != parentURI {
+		rootCID, err = c.GetRecordCID(rootURI)
+		if err != nil {
+			return nil, fmt.Errorf("fetching root CID: %w", err)
+		}
+	}
+	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, &parentURI, &rootURI, &parentCID, &rootCID)
 }
 
-func (c *Client) createRecord(url, text string, image *ImageData, parentURI, rootURI *string) (*PostRef, error) {
+func (c *Client) createRecord(url, text string, image *ImageData, parentURI, rootURI, parentCID, rootCID *string) (*PostRef, error) {
 	if c.accessJwt == "" || c.did == "" {
 		return nil, fmt.Errorf("not authenticated — call Authenticate() first")
 	}
@@ -154,21 +205,24 @@ func (c *Client) createRecord(url, text string, image *ImageData, parentURI, roo
 	}
 
 	if parentURI != nil && *parentURI != "" {
-		parentCID := ExtractCID(*parentURI)
-		rootURIVal := *parentURI
-		rootCID := parentCID
-		if rootURI != nil && *rootURI != "" {
-			rootURIVal = *rootURI
-			rootCID = ExtractCID(*rootURI)
-		}
 		rec["reply"] = map[string]interface{}{
 			"parent": map[string]interface{}{
 				"uri":  *parentURI,
-				"cid":  parentCID,
+				"cid":  *parentCID,
 			},
 			"root": map[string]interface{}{
-				"uri": rootURIVal,
-				"cid": rootCID,
+				"uri": func() string {
+					if rootURI != nil && *rootURI != "" {
+						return *rootURI
+					}
+					return *parentURI
+				}(),
+				"cid": func() string {
+					if rootCID != nil && *rootCID != "" {
+						return *rootCID
+					}
+					return *parentCID
+				}(),
 			},
 		}
 	}
