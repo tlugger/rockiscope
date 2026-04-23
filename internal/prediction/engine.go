@@ -12,9 +12,9 @@ import (
 // Prediction is the output of the prediction engine.
 type Prediction struct {
 	WinProbability float64
-	Pick            string // "W" or "L"
-	Confidence      string // human-readable confidence descriptor
-	Factors         map[string]float64
+	Pick           string // "W" or "L"
+	Confidence     string // human-readable confidence descriptor
+	Factors        map[string]float64
 }
 
 // Input holds all the data the engine needs. Any field can be nil/zero
@@ -126,8 +126,8 @@ func Predict(in Input) Prediction {
 
 	return Prediction{
 		WinProbability: prob,
-		Pick:            pick,
-		Confidence:      confidenceLabel(prob),
+		Pick:           pick,
+		Confidence:     confidenceLabel(prob),
 		Factors:        factors,
 	}
 }
@@ -160,7 +160,7 @@ func pitcherFactor(rockies, opponent *mlb.PitcherStats) float64 {
 	// Combine: how much better is our pitcher vs theirs
 	// Higher rockiesScore = better pitcher for us. Higher opponentScore = worse matchup for us.
 	// We want: Rockies good + opponent bad = high result.
-	eraAdvantage := (rockiesScore - opponentScore + 1) / 2   // 0-1, 0.5 = even
+	eraAdvantage := (rockiesScore - opponentScore + 1) / 2 // 0-1, 0.5 = even
 	whipAdvantage := (rockiesWHIPScore - opponentWHIPScore + 1) / 2
 
 	return eraAdvantage*0.6 + whipAdvantage*0.4
@@ -203,11 +203,11 @@ func horoscopeScore(text string) float64 {
 func confidenceLabel(prob float64) string {
 	dist := math.Abs(prob - 0.5)
 	switch {
-	case dist > 0.35:
+	case dist > 0.30:
 		return "The stars are screaming"
-	case dist > 0.25:
+	case dist > 0.20:
 		return "The cosmos strongly favor"
-	case dist > 0.15:
+	case dist > 0.10:
 		return "The stars lean toward"
 	case dist > 0.05:
 		return "A slight celestial nudge toward"

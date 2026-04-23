@@ -207,7 +207,7 @@ func TestConfidenceLabel(t *testing.T) {
 		want string
 	}{
 		{0.95, "The stars are screaming"},
-		{0.80, "The cosmos strongly favor"},
+		{0.75, "The cosmos strongly favor"},
 		{0.70, "The stars lean toward"},
 		{0.58, "A slight celestial nudge toward"},
 		{0.51, "A cosmic coin flip"},
