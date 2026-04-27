@@ -199,21 +199,42 @@ func (s *Scheduler) calculateSleepDuration() time.Duration {
 	now := s.now().In(denver)
 	today := now.Format("2006-01-02")
 
-	if s.lastPostDate == today && s.lastReplyDate != today {
-		game, err := s.mlb.GetTodayGame()
-		if err == nil && game != nil {
-			if game.Status == "Final" {
-				return 1 * time.Minute
+	games, err := s.mlb.GetTodayGames()
+	if err == nil && len(games) > 0 {
+		if s.lastPostDate == today && s.lastReplyDate != today {
+			for _, game := range games {
+				if !s.hasPostedGame(game.GamePk) && game.Status != "Final" {
+					gameTime := now
+					if game.GameDateTime.After(now) {
+						gameTime = game.GameDateTime.In(denver)
+					}
+					wakeTime := gameTime.Add(30 * time.Minute)
+					if wakeTime.After(now) {
+						return wakeTime.Sub(now)
+					}
+					return 30 * time.Minute
+				}
 			}
-			gameTime := now
-			if game.GameDateTime.After(now) {
-				gameTime = game.GameDateTime.In(denver)
+			return 1 * time.Minute
+		}
+
+		if s.lastPostDate != today {
+			earliestGameTime := time.Time{}
+			for _, game := range games {
+				if s.hasPostedGame(game.GamePk) {
+					continue
+				}
+				gameTime := game.GameDateTime.In(denver)
+				if earliestGameTime.IsZero() || gameTime.Before(earliestGameTime) {
+					earliestGameTime = gameTime
+				}
 			}
-			wakeTime := gameTime.Add(30 * time.Minute)
-			if wakeTime.After(now) {
-				return wakeTime.Sub(now)
+			if !earliestGameTime.IsZero() && earliestGameTime.After(now) {
+				wakeTime := earliestGameTime.Add(-1 * time.Hour)
+				if wakeTime.After(now) {
+					return wakeTime.Sub(now)
+				}
 			}
-			return 30 * time.Minute
 		}
 	}
 
@@ -229,24 +250,40 @@ func (s *Scheduler) tick() error {
 	denver := mlb.DenverLocation()
 	today := s.now().In(denver).Format("2006-01-02")
 
-	game, err := s.mlb.GetTodayGame()
+	games, err := s.mlb.GetTodayGames()
 	if err != nil {
-		return fmt.Errorf("fetching today's game: %w", err)
+		return fmt.Errorf("fetching today's games: %w", err)
 	}
 
-	if game != nil {
-		isFinal := game.Status == "Final"
+	if len(games) > 0 {
+		anyGamePosted := false
+		for _, game := range games {
+			isFinal := game.Status == "Final"
 
-		if isFinal && s.lastReplyDate != today {
-			s.logger.Println("game is final, posting reply...")
-			return s.handleGameReply(game, today)
+			if isFinal && s.lastReplyDate != today {
+				s.logger.Println("game is final, posting reply...")
+				if err := s.handleGameReply(game, today); err != nil {
+					return err
+				}
+			}
+
+			alreadyPosted := s.hasPostedGame(game.GamePk)
+			if !alreadyPosted {
+				if err := s.handleGameDay(game, today); err != nil {
+					return err
+				}
+				anyGamePosted = true
+				continue
+			}
+
+			s.logger.Printf("game %d already posted, skipping", game.GamePk)
 		}
 
-		if s.lastPostDate != today {
-			return s.handleGameDay(game, today)
+		if anyGamePosted {
+			s.logger.Printf("posted predictions for today's games")
+		} else if s.lastPostDate == today {
+			s.logger.Printf("already posted today (waiting for final)")
 		}
-
-		s.logger.Printf("already posted today (waiting for final)")
 		return nil
 	}
 
@@ -646,6 +683,18 @@ func (s *Scheduler) getOpponentPitcher(game *mlb.Game) *mlb.PitcherStats {
 		return nil
 	}
 	return stats
+}
+
+func (s *Scheduler) hasPostedGame(gamePk int) bool {
+	if s.predHistory == nil {
+		return false
+	}
+	for _, p := range s.predHistory.Predictions {
+		if p.GamePK == gamePk {
+			return true
+		}
+	}
+	return false
 }
 
 func (s *Scheduler) nextCheckTime() time.Time {

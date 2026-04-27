@@ -11,6 +11,8 @@ type Game struct {
 	AwayTeam     TeamInfo
 	Venue        string
 	IsHome       bool // true if Rockies are the home team
+	GameNumber   int    // 1 or 2 for double-headers
+	DoubleHeader string // "Y" (straight), "S" (split), "N" (not)
 }
 
 type TeamInfo struct {
@@ -70,6 +72,7 @@ type H2HRecord struct {
 // depends on this interface, making it trivially mockable in tests.
 type GameProvider interface {
 	GetTodayGame() (*Game, error)
+	GetTodayGames() ([]*Game, error)
 	GetTeamRecord() (*TeamRecord, error)
 	GetPitcherStats(playerID int) (*PitcherStats, error)
 	GetHeadToHead(opponentID int) (*H2HRecord, error)

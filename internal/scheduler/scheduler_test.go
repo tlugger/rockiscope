@@ -16,16 +16,34 @@ import (
 
 type mockMLB struct {
 	game      *mlb.Game
+	games    []*mlb.Game
 	record   *mlb.TeamRecord
-	pitcher   *mlb.PitcherStats
-	h2h       *mlb.H2HRecord
+	pitcher  *mlb.PitcherStats
+	h2h      *mlb.H2HRecord
 	gamesSince []mlb.GameResult
 }
 
-func (m *mockMLB) GetTodayGame() (*mlb.Game, error)                  { return m.game, nil }
-func (m *mockMLB) GetTeamRecord() (*mlb.TeamRecord, error)           { return m.record, nil }
+func (m *mockMLB) GetTodayGame() (*mlb.Game, error) {
+	if m.game != nil {
+		return m.game, nil
+	}
+	if len(m.games) > 0 {
+		return m.games[0], nil
+	}
+	return nil, nil
+}
+func (m *mockMLB) GetTodayGames() ([]*mlb.Game, error) {
+	if len(m.games) > 0 {
+		return m.games, nil
+	}
+	if m.game != nil {
+		return []*mlb.Game{m.game}, nil
+	}
+	return nil, nil
+}
+func (m *mockMLB) GetTeamRecord() (*mlb.TeamRecord, error)        { return m.record, nil }
 func (m *mockMLB) GetPitcherStats(id int) (*mlb.PitcherStats, error) { return m.pitcher, nil }
-func (m *mockMLB) GetHeadToHead(id int) (*mlb.H2HRecord, error)     { return m.h2h, nil }
+func (m *mockMLB) GetHeadToHead(id int) (*mlb.H2HRecord, error)  { return m.h2h, nil }
 func (m *mockMLB) GetGamesSince(date string) ([]mlb.GameResult, error) { return m.gamesSince, nil }
 
 type mockHoroscope struct {
@@ -369,6 +387,44 @@ func TestCheckForCompletedGames_MatchingResults(t *testing.T) {
 	}
 }
 
+func TestCheckForCompletedGames_MatchesByDateAndOpponent(t *testing.T) {
+	denver := mlb.DenverLocation()
+	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, denver)
+	poster := &mockPoster{}
+
+	s := &Scheduler{
+		mlb: &mockMLB{
+			gamesSince: []mlb.GameResult{
+				{GamePk: 0, Date: "2026-04-08", Opponent: "Houston Astros", Won: true}, // GamePK not set, tests fallback
+			},
+		},
+		poster:    poster,
+		now:       func() time.Time { return nowTime },
+		sleep:     func(d time.Duration) {},
+		logger:    testLogger(),
+		dataDir:   "",
+		predHistory: &prediction.PredictionHistory{
+			Predictions: []prediction.PredictionRecord{
+				{Date: "2026-04-08", Opponent: "Houston Astros", Predicted: "W", GamePK: 0}, // no GamePK
+			},
+			Current: prediction.Weights{WinRate: 0.30, Pitcher: 0.30},
+		},
+	}
+
+	err := s.checkForCompletedGames()
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if s.predHistory.Predictions[0].Actual != "W" {
+		t.Errorf("expected actual = W, got %s", s.predHistory.Predictions[0].Actual)
+	}
+
+	if len(poster.replies) != 1 {
+		t.Fatalf("expected 1 reply, got %d", len(poster.replies))
+	}
+}
+
 func TestCheckForCompletedGames_WrongPrediction(t *testing.T) {
 	denver := mlb.DenverLocation()
 	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, denver)
@@ -476,5 +532,110 @@ func TestCheckForCompletedGames_WeightAdjustment(t *testing.T) {
 	originalWinRate := prediction.Weights{WinRate: 0.30, Pitcher: 0.30}.WinRate
 	if s.predHistory.Current.WinRate == originalWinRate {
 		t.Logf("weights may adjust after 3+ predictions, got winRate=%f", s.predHistory.Current.WinRate)
+	}
+}
+
+func TestTick_DoubleHeader_PostsBoth(t *testing.T) {
+	gameTime := time.Date(2026, 4, 26, 18, 40, 0, 0, time.UTC)
+	nowTime := gameTime.Add(-30 * time.Minute)
+
+	poster := &mockPoster{}
+	s := &Scheduler{
+		mlb: &mockMLB{
+			games: []*mlb.Game{
+				{
+					GamePk: 778901, GameDateTime: gameTime, Status: "Preview",
+					Venue: "Coors Field", IsHome: true, GameNumber: 1, DoubleHeader: "Y",
+					HomeTeam: mlb.TeamInfo{ID: 115, Name: "Colorado Rockies", Wins: 7, Losses: 8,
+						ProbablePitcher: &mlb.PitcherInfo{ID: 547179, FullName: "Michael Lorenzen"}},
+					AwayTeam: mlb.TeamInfo{ID: 117, Name: "Houston Astros", Wins: 9, Losses: 6,
+						ProbablePitcher: &mlb.PitcherInfo{ID: 621111, FullName: "Framber Valdez"}},
+				},
+				{
+					GamePk: 778902, GameDateTime: gameTime.Add(90 * time.Minute), Status: "Preview",
+					Venue: "Coors Field", IsHome: true, GameNumber: 2, DoubleHeader: "Y",
+					HomeTeam: mlb.TeamInfo{ID: 115, Name: "Colorado Rockies", Wins: 7, Losses: 8,
+						ProbablePitcher: &mlb.PitcherInfo{ID: 668678, FullName: "Antonio Senzatela"}},
+					AwayTeam: mlb.TeamInfo{ID: 117, Name: "Houston Astros", Wins: 9, Losses: 6,
+						ProbablePitcher: &mlb.PitcherInfo{ID: 657514, FullName: "Luis Garcia"}},
+				},
+			},
+			record:  &mlb.TeamRecord{Wins: 7, Losses: 8, WinningPercentage: 0.467},
+			pitcher: &mlb.PitcherStats{FullName: "Michael Lorenzen", ERA: 4.50, Wins: 1, Losses: 1},
+			h2h:     &mlb.H2HRecord{OpponentName: "Houston Astros", Wins: 2, Losses: 1},
+		},
+		horoscope: &mockHoroscope{
+			horo: &horoscope.Horoscope{Sign: "cancer", Text: "Double header, double fun."},
+		},
+		poster: poster,
+		now:    func() time.Time { return nowTime },
+		sleep:  func(d time.Duration) {},
+		logger: testLogger(),
+	}
+
+	if err := s.Tick(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(poster.posts) != 2 {
+		t.Fatalf("expected 2 posts for double-header, got %d", len(poster.posts))
+	}
+
+	if !strings.Contains(poster.posts[0], "⚾ Rockies vs Houston Astros") {
+		t.Errorf("first post missing matchup: %s", poster.posts[0])
+	}
+	if !strings.Contains(poster.posts[1], "⚾ Rockies vs Houston Astros") {
+		t.Errorf("second post missing matchup: %s", poster.posts[1])
+	}
+
+	if s.lastPostDate != "2026-04-26" {
+		t.Errorf("lastPostDate = %q, want 2026-04-26", s.lastPostDate)
+	}
+}
+
+func TestTick_DoubleHeader_SkipsAlreadyPosted(t *testing.T) {
+	gameTime := time.Date(2026, 4, 26, 18, 40, 0, 0, time.UTC)
+	nowTime := gameTime.Add(-30 * time.Minute)
+
+	poster := &mockPoster{}
+	s := &Scheduler{
+		mlb: &mockMLB{
+			games: []*mlb.Game{
+				{
+					GamePk: 778901, GameDateTime: gameTime, Status: "Preview",
+					Venue: "Coors Field", IsHome: true, GameNumber: 1, DoubleHeader: "Y",
+					HomeTeam: mlb.TeamInfo{ID: 115, Name: "Colorado Rockies", Wins: 7, Losses: 8},
+					AwayTeam: mlb.TeamInfo{ID: 117, Name: "Houston Astros", Wins: 9, Losses: 6},
+				},
+				{
+					GamePk: 778902, GameDateTime: gameTime.Add(90 * time.Minute), Status: "Preview",
+					Venue: "Coors Field", IsHome: true, GameNumber: 2, DoubleHeader: "Y",
+					HomeTeam: mlb.TeamInfo{ID: 115, Name: "Colorado Rockies", Wins: 7, Losses: 8},
+					AwayTeam: mlb.TeamInfo{ID: 117, Name: "Houston Astros", Wins: 9, Losses: 6},
+				},
+			},
+			record: &mlb.TeamRecord{Wins: 7, Losses: 8},
+		},
+		horoscope: &mockHoroscope{
+			horo: &horoscope.Horoscope{Sign: "cancer", Text: "Double header."},
+		},
+		poster:    poster,
+		now:       func() time.Time { return nowTime },
+		sleep:     func(d time.Duration) {},
+		logger:    testLogger(),
+		predHistory: &prediction.PredictionHistory{
+			Predictions: []prediction.PredictionRecord{
+				{Date: "2026-04-26", Opponent: "Houston Astros", Predicted: "W", GamePK: 778901},
+			},
+			Current: prediction.DefaultWeights(),
+		},
+	}
+
+	if err := s.Tick(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(poster.posts) != 1 {
+		t.Fatalf("expected 1 post (game 1 already posted), got %d", len(poster.posts))
 	}
 }

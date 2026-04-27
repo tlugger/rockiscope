@@ -39,6 +39,12 @@ func (c *Client) GetTodayGame() (*Game, error) {
 	return c.getGameFromURL(url)
 }
 
+func (c *Client) GetTodayGames() ([]*Game, error) {
+	today := c.now().In(denverLoc()).Format("2006-01-02")
+	url := fmt.Sprintf("%s/schedule?sportId=1&teamId=%d&date=%s&hydrate=probablePitcher", baseURL, c.teamID, today)
+	return c.getGamesFromURL(url)
+}
+
 func (c *Client) GetTeamRecord() (*TeamRecord, error) {
 	season := c.now().Year()
 	url := fmt.Sprintf("%s/standings?leagueId=%d&season=%d", baseURL, NLLeagueID, season)
@@ -83,9 +89,17 @@ func (c *Client) GetGamesSince(date string) ([]GameResult, error) {
 				continue
 			}
 
+			gameTime, err := time.Parse(time.RFC3339Nano, g.GameDate)
+			if err != nil {
+				gameTime, err = time.Parse("2006-01-02T15:04:05Z", g.GameDate)
+				if err != nil {
+					continue
+				}
+			}
+
 			var gr GameResult
 			gr.GamePk = g.GamePk
-			gr.Date = g.GameDate
+			gr.Date = gameTime.Format("2006-01-02")
 			gr.Status = g.Status.AbstractGameState
 
 			if g.Teams.Away.Team.ID == c.teamID {
@@ -122,6 +136,25 @@ func (c *Client) getGameFromURL(url string) (*Game, error) {
 		return nil, nil
 	}
 	return c.parseGame(resp.Dates[0].Games[0])
+}
+
+func (c *Client) getGamesFromURL(url string) ([]*Game, error) {
+	var resp scheduleResponse
+	if err := c.getJSON(url, &resp); err != nil {
+		return nil, fmt.Errorf("fetching schedule: %w", err)
+	}
+	if len(resp.Dates) == 0 || len(resp.Dates[0].Games) == 0 {
+		return nil, nil
+	}
+	var games []*Game
+	for _, g := range resp.Dates[0].Games {
+		game, err := c.parseGame(g)
+		if err != nil {
+			return nil, fmt.Errorf("parsing game: %w", err)
+		}
+		games = append(games, game)
+	}
+	return games, nil
 }
 
 func (c *Client) getTeamRecordFromURL(url string) (*TeamRecord, error) {
@@ -167,6 +200,8 @@ func (c *Client) parseGame(g scheduleGame) (*Game, error) {
 		Status:       g.Status.AbstractGameState,
 		Venue:        g.Venue.Name,
 		IsHome:       isHome,
+		GameNumber:   g.GameNumber,
+		DoubleHeader: g.DoubleHeader,
 		HomeTeam: TeamInfo{
 			ID:     g.Teams.Home.Team.ID,
 			Name:   g.Teams.Home.Team.Name,
@@ -390,16 +425,18 @@ type scheduleResponse struct {
 }
 
 type scheduleGame struct {
-	GamePk   int    `json:"gamePk"`
-	GameDate string `json:"gameDate"`
-	Status   struct {
+	GamePk     int    `json:"gamePk"`
+	GameDate   string `json:"gameDate"`
+	GameNumber int    `json:"gameNumber"`
+	DoubleHeader string `json:"doubleheader"`
+	Status     struct {
 		AbstractGameState string `json:"abstractGameState"`
 	} `json:"status"`
-	Teams struct {
+	Teams  struct {
 		Away scheduleTeam `json:"away"`
 		Home scheduleTeam `json:"home"`
 	} `json:"teams"`
-	Venue struct {
+	Venue  struct {
 		Name string `json:"name"`
 	} `json:"venue"`
 }

@@ -108,6 +108,90 @@ func TestGetTodayGame_OffDay(t *testing.T) {
 	}
 }
 
+func TestGetTodayGames_DoubleHeader(t *testing.T) {
+	ts := fixtureServer(t, "../../testdata/schedule_doubleheader.json")
+	defer ts.Close()
+
+	c := &Client{
+		httpClient: ts.Client(),
+		teamID:     RockiesID,
+		now:        func() time.Time { return time.Date(2026, 4, 26, 12, 0, 0, 0, time.UTC) },
+	}
+
+	games, err := c.getGamesFromURL(ts.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(games) != 2 {
+		t.Fatalf("expected 2 games, got %d", len(games))
+	}
+
+	if games[0].GamePk != 778901 {
+		t.Errorf("game 1 pk = %d, want 778901", games[0].GamePk)
+	}
+	if games[1].GamePk != 778902 {
+		t.Errorf("game 2 pk = %d, want 778902", games[1].GamePk)
+	}
+
+	if games[0].GameNumber != 1 {
+		t.Errorf("game 1 number = %d, want 1", games[0].GameNumber)
+	}
+	if games[1].GameNumber != 2 {
+		t.Errorf("game 2 number = %d, want 2", games[1].GameNumber)
+	}
+
+	if games[0].DoubleHeader != "Y" {
+		t.Errorf("game 1 doubleheader = %q, want Y", games[0].DoubleHeader)
+	}
+	if games[1].DoubleHeader != "Y" {
+		t.Errorf("game 2 doubleheader = %q, want Y", games[1].DoubleHeader)
+	}
+}
+
+func TestGetTodayGames_SingleGame(t *testing.T) {
+	ts := fixtureServer(t, "../../testdata/schedule.json")
+	defer ts.Close()
+
+	c := &Client{
+		httpClient: ts.Client(),
+		teamID:     RockiesID,
+		now:        func() time.Time { return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC) },
+	}
+
+	games, err := c.getGamesFromURL(ts.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(games) != 1 {
+		t.Fatalf("expected 1 game, got %d", len(games))
+	}
+
+	if games[0].GamePk != 778899 {
+		t.Errorf("game pk = %d, want 778899", games[0].GamePk)
+	}
+}
+
+func TestGetTodayGames_OffDay(t *testing.T) {
+	ts := fixtureServer(t, "../../testdata/schedule_offday.json")
+	defer ts.Close()
+
+	c := &Client{
+		httpClient: ts.Client(),
+		teamID:     RockiesID,
+		now:        func() time.Time { return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC) },
+	}
+
+	games, err := c.getGamesFromURL(ts.URL)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if games != nil {
+		t.Fatalf("expected nil games on off-day, got %+v", games)
+	}
+}
+
 func TestGetTeamRecord(t *testing.T) {
 	ts := fixtureServer(t, "../../testdata/standings.json")
 	defer ts.Close()

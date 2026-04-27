@@ -1,0 +1,100 @@
+{
+  "dates": [
+    {
+      "games": [
+        {
+          "gamePk": 778901,
+          "gameDate": "2026-04-26T18:40:00Z",
+          "gameNumber": 1,
+          "doubleheader": "Y",
+          "status": {
+            "abstractGameState": "Preview"
+          },
+          "teams": {
+            "away": {
+              "score": 0,
+              "team": {
+                "id": 117,
+                "name": "Houston Astros"
+              },
+              "leagueRecord": {
+                "wins": 9,
+                "losses": 6,
+                "pct": ".600"
+              },
+              "probablePitcher": {
+                "id": 621111,
+                "fullName": "Framber Valdez"
+              }
+            },
+            "home": {
+              "score": 0,
+              "team": {
+                "id": 115,
+                "name": "Colorado Rockies"
+              },
+              "leagueRecord": {
+                "wins": 7,
+                "losses": 8,
+                "pct": ".467"
+              },
+              "probablePitcher": {
+                "id": 547179,
+                "fullName": "Michael Lorenzen"
+              }
+            }
+          },
+          "venue": {
+            "name": "Coors Field"
+          }
+        },
+        {
+          "gamePk": 778902,
+          "gameDate": "2026-04-26T20:10:00Z",
+          "gameNumber": 2,
+          "doubleheader": "Y",
+          "status": {
+            "abstractGameState": "Preview"
+          },
+          "teams": {
+            "away": {
+              "score": 0,
+              "team": {
+                "id": 117,
+                "name": "Houston Astros"
+              },
+              "leagueRecord": {
+                "wins": 9,
+                "losses": 6,
+                "pct": ".600"
+              },
+              "probablePitcher": {
+                "id": 657514,
+                "fullName": "Luis Garcia"
+              }
+            },
+            "home": {
+              "score": 0,
+              "team": {
+                "id": 115,
+                "name": "Colorado Rockies"
+              },
+              "leagueRecord": {
+                "wins": 7,
+                "losses": 8,
+                "pct": ".467"
+              },
+              "probablePitcher": {
+                "id": 668678,
+                "fullName": "Antonio Senzatela"
+              }
+            }
+          },
+          "venue": {
+            "name": "Coors Field"
+          }
+        }
+      ]
+    }
+  ]
+}
