@@ -4,15 +4,28 @@ import "time"
 
 // Game represents a single Rockies game.
 type Game struct {
-	GamePk       int
-	GameDateTime time.Time
-	Status       string // "Preview", "Live", "Final"
-	HomeTeam     TeamInfo
-	AwayTeam     TeamInfo
-	Venue        string
-	IsHome       bool // true if Rockies are the home team
-	GameNumber   int    // 1 or 2 for double-headers
-	DoubleHeader string // "Y" (straight), "S" (split), "N" (not)
+	GamePk        int
+	GameDateTime  time.Time
+	Status        string // "Preview", "Live", "Final" (abstractGameState)
+	DetailedState string // "Scheduled", "Postponed", "Cancelled", etc.
+	Reason        string // reason for postponement/cancellation
+	HomeTeam      TeamInfo
+	AwayTeam      TeamInfo
+	Venue         string
+	IsHome        bool // true if Rockies are the home team
+	GameNumber    int  // 1 or 2 for double-headers
+	DoubleHeader  string // "Y" (straight), "S" (split), "N" (not)
+}
+
+func (g *Game) IsPlayable() bool {
+	switch g.DetailedState {
+	case "Scheduled", "In Progress", "Final", "Suspended":
+		return true
+	case "Postponed", "Cancelled", "Delayed", "Weather Delay", "Facility Delay":
+		return false
+	default:
+		return g.Status == "Preview" || g.Status == "Live" || g.Status == "Final"
+	}
 }
 
 type TeamInfo struct {

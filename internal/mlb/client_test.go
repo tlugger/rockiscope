@@ -323,3 +323,43 @@ func TestGameHelpers(t *testing.T) {
 		t.Errorf("W-L = %q, want 5-6", game.RockiesTeam().WinLossString())
 	}
 }
+
+func TestGameIsPlayable(t *testing.T) {
+	tests := []struct {
+		name          string
+		detailedState string
+		abstractState string
+		reason        string
+		wantPlayable  bool
+	}{
+		{"Scheduled game", "Scheduled", "Preview", "", true},
+		{"Live game", "In Progress", "Live", "", true},
+		{"Final game", "Final", "Final", "", true},
+		{"Postponed game", "Postponed", "Final", "", false},
+		{"Cancelled game", "Cancelled", "Final", "", false},
+		{"Suspended game", "Suspended", "Final", "", true},
+		{"Weather delay", "Delayed", "Live", "Rain", false},
+		{"Facility delay", "Delayed", "Live", "Lighting issue", false},
+		{"Game postponed with reason", "Postponed", "Final", "Rain", false},
+		{"Game cancelled with reason", "Cancelled", "Final", "Field condition", false},
+		{"Fallback to abstract - Preview", "", "Preview", "", true},
+		{"Fallback to abstract - Live", "", "Live", "", true},
+		{"Fallback to abstract - Final", "", "Final", "", true},
+		{"Unknown state defaults to playable", "Unknown", "Preview", "", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			game := &Game{
+				GamePk:        12345,
+				Status:        tt.abstractState,
+				DetailedState: tt.detailedState,
+				Reason:        tt.reason,
+			}
+			if got := game.IsPlayable(); got != tt.wantPlayable {
+				t.Errorf("IsPlayable() = %v, want %v for detailedState=%q abstractState=%q reason=%q",
+					got, tt.wantPlayable, tt.detailedState, tt.abstractState, tt.reason)
+			}
+		})
+	}
+}

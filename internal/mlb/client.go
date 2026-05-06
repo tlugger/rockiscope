@@ -195,13 +195,15 @@ func (c *Client) parseGame(g scheduleGame) (*Game, error) {
 	isHome := g.Teams.Home.Team.ID == c.teamID
 
 	game := &Game{
-		GamePk:       g.GamePk,
-		GameDateTime: gameTime,
-		Status:       g.Status.AbstractGameState,
-		Venue:        g.Venue.Name,
-		IsHome:       isHome,
-		GameNumber:   g.GameNumber,
-		DoubleHeader: g.DoubleHeader,
+		GamePk:        g.GamePk,
+		GameDateTime:  gameTime,
+		Status:        g.Status.AbstractGameState,
+		DetailedState: g.Status.DetailedState,
+		Reason:        g.Status.Reason,
+		Venue:         g.Venue.Name,
+		IsHome:        isHome,
+		GameNumber:    g.GameNumber,
+		DoubleHeader:  g.DoubleHeader,
 		HomeTeam: TeamInfo{
 			ID:     g.Teams.Home.Team.ID,
 			Name:   g.Teams.Home.Team.Name,
@@ -431,6 +433,8 @@ type scheduleGame struct {
 	DoubleHeader string `json:"doubleheader"`
 	Status     struct {
 		AbstractGameState string `json:"abstractGameState"`
+		DetailedState     string `json:"detailedState"`
+		Reason            string `json:"reason"`
 	} `json:"status"`
 	Teams  struct {
 		Away scheduleTeam `json:"away"`

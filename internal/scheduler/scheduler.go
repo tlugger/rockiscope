@@ -268,7 +268,7 @@ func (s *Scheduler) tick() error {
 			}
 
 			alreadyPosted := s.hasPostedGame(game.GamePk)
-			if !alreadyPosted {
+			if !alreadyPosted && game.IsPlayable() {
 				if err := s.handleGameDay(game, today); err != nil {
 					return err
 				}
