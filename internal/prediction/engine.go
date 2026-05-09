@@ -28,49 +28,39 @@ type Input struct {
 	HoroscopeText   string
 }
 
-// Factor weights — must sum to 1.0.
-const (
-	weightWinRate  = 0.30
-	weightPitcher  = 0.30
-	weightH2H      = 0.15
-	weightHomeAway = 0.10
-	weightMomentum = 0.05
-	weightStars    = 0.10
-)
-
 // Predict computes a win probability and pick from the input data.
-// All logic is pure — no I/O, fully deterministic for the same inputs.
-func Predict(in Input) Prediction {
+// Uses the provided weights; pass DefaultWeights() if no learned weights exist.
+func Predict(in Input, w Weights) Prediction {
 	factors := make(map[string]float64)
 	totalWeight := 0.0
 	weightedSum := 0.0
 
 	// 1. Win rate factor
 	if in.Record != nil && (in.Record.Wins+in.Record.Losses) > 0 {
-		totalWeight += weightWinRate
-		weightedSum += weightWinRate * in.Record.WinningPercentage
+		totalWeight += w.WinRate
+		weightedSum += w.WinRate * in.Record.WinningPercentage
 		factors["winRate"] = in.Record.WinningPercentage
 	}
 
 	// 2. Pitcher matchup factor
 	pitcherScore := pitcherFactor(in.RockiesPitcher, in.OpponentPitcher)
 	if pitcherScore >= 0 {
-		totalWeight += weightPitcher
-		weightedSum += weightPitcher * pitcherScore
+		totalWeight += w.Pitcher
+		weightedSum += w.Pitcher * pitcherScore
 		factors["pitcher"] = pitcherScore
 	}
 
 	// 3. Head-to-head factor
 	if in.HeadToHead != nil && in.HeadToHead.GamesPlayed > 0 {
-		totalWeight += weightH2H
+		totalWeight += w.H2H
 		h2hPct := float64(in.HeadToHead.Wins) / float64(in.HeadToHead.GamesPlayed)
-		weightedSum += weightH2H * h2hPct
+		weightedSum += w.H2H * h2hPct
 		factors["h2h"] = h2hPct
 	}
 
 	// 4. Home/away factor
 	if in.Record != nil {
-		totalWeight += weightHomeAway
+		totalWeight += w.HomeAway
 		homeAwayScore := 0.54
 		if in.IsHome {
 			homeGames := in.Record.HomeWins + in.Record.HomeLosses
@@ -85,23 +75,23 @@ func Predict(in Input) Prediction {
 				homeAwayScore = 0.46
 			}
 		}
-		weightedSum += weightHomeAway * homeAwayScore
+		weightedSum += w.HomeAway * homeAwayScore
 		factors["homeAway"] = homeAwayScore
 	}
 
 	// 5. Momentum factor (streak)
 	if in.Record != nil && in.Record.StreakCode != "" {
-		totalWeight += weightMomentum
+		totalWeight += w.Momentum
 		momentumScore := streakScore(in.Record.StreakCode)
-		weightedSum += weightMomentum * momentumScore
+		weightedSum += w.Momentum * momentumScore
 		factors["momentum"] = momentumScore
 	}
 
 	// 6. Horoscope factor — the stars speak
 	if in.HoroscopeText != "" {
-		totalWeight += weightStars
+		totalWeight += w.Stars
 		starsScore := horoscopeScore(in.HoroscopeText)
-		weightedSum += weightStars * starsScore
+		weightedSum += w.Stars * starsScore
 		factors["stars"] = starsScore
 	}
 

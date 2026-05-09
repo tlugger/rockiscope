@@ -111,6 +111,10 @@ func TestTick_GameDay(t *testing.T) {
 			horo: &horoscope.Horoscope{Sign: "cancer", Text: "The stars favor bold moves today."},
 		},
 		poster: poster,
+		predHistory: &prediction.PredictionHistory{
+			Predictions: []prediction.PredictionRecord{},
+			Current:     prediction.DefaultWeights(),
+		},
 		now:    func() time.Time { return nowTime },
 		sleep:  func(d time.Duration) {},
 		logger: testLogger(),

@@ -438,6 +438,11 @@ func (s *Scheduler) buildGameDayPost(game *mlb.Game) formatter.Post {
 		horoText = horo.Text
 	}
 
+	weights := prediction.DefaultWeights()
+	if s.predHistory != nil {
+		weights = s.predHistory.Current
+	}
+
 	pred := prediction.Predict(prediction.Input{
 		Record:          record,
 		RockiesPitcher:  pitcherStats,
@@ -445,7 +450,7 @@ func (s *Scheduler) buildGameDayPost(game *mlb.Game) formatter.Post {
 		HeadToHead:      h2h,
 		IsHome:          game.IsHome,
 		HoroscopeText:   horoText,
-	})
+	}, weights)
 
 	return formatter.FormatGameDay(formatter.GameDayPost{
 		Game:       game,
@@ -587,16 +592,21 @@ func (s *Scheduler) checkForCompletedGames() error {
 		return fmt.Errorf("fetching completed games: %w", err)
 	}
 
+	newResults := false
 	for _, gr := range games {
-		s.processCompletedGame(gr, today)
+		if s.processCompletedGame(gr, today) {
+			newResults = true
+		}
 	}
 
-	recent := s.predHistory.Recent(10)
-	if len(recent) >= 3 {
-		accuracy := prediction.CalculateFactorAccuracy(recent)
-		newWeights := prediction.AdjustWeights(s.predHistory.Current, accuracy, len(recent))
+	if newResults {
+		completed := s.predHistory.Completed()
+		totalGames := len(completed)
+		accuracy, sampleCounts := prediction.CalculateFactorAccuracy(completed)
+		newWeights := prediction.AdjustWeights(s.predHistory.Current, accuracy, sampleCounts, totalGames)
 		s.predHistory.Current = newWeights
-		s.logger.Printf("adjusted weights: winRate=%.0f%% pitcher=%.0f%% h2h=%.0f%% homeAway=%.0f%% momentum=%.0f%% stars=%.0f%%",
+		s.logger.Printf("adjusted weights (%d games): winRate=%.0f%% pitcher=%.0f%% h2h=%.0f%% homeAway=%.0f%% momentum=%.0f%% stars=%.0f%%",
+			totalGames,
 			newWeights.WinRate*100, newWeights.Pitcher*100, newWeights.H2H*100,
 			newWeights.HomeAway*100, newWeights.Momentum*100, newWeights.Stars*100)
 		if err := s.savePredictionHistory(); err != nil {
@@ -607,9 +617,9 @@ func (s *Scheduler) checkForCompletedGames() error {
 	return nil
 }
 
-func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) {
+func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) bool {
 	if s.predHistory == nil {
-		return
+		return false
 	}
 
 	found := false
@@ -651,6 +661,7 @@ func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) {
 	if !found {
 		s.logger.Printf("no matching prediction for game: %s %d-%d", gr.Opponent, gr.RockiesScore, gr.OppScore)
 	}
+	return found
 }
 
 func (s *Scheduler) postFollowUp(parentURI string, correct bool, actual, score, record string) error {

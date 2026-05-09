@@ -22,7 +22,7 @@ func TestPredict_FullData(t *testing.T) {
 		HoroscopeText:   "The stars align for great fortune today",
 	}
 
-	p := Predict(in)
+	p := Predict(in, DefaultWeights())
 
 	if p.Pick != "W" {
 		t.Errorf("expected W with favorable stats, got %s", p.Pick)
@@ -50,7 +50,7 @@ func TestPredict_Underdog(t *testing.T) {
 		HoroscopeText:   "Today brings challenges and tests of patience",
 	}
 
-	p := Predict(in)
+	p := Predict(in, DefaultWeights())
 
 	if p.Pick != "L" {
 		t.Errorf("expected L with poor stats, got %s (prob=%f)", p.Pick, p.WinProbability)
@@ -61,7 +61,7 @@ func TestPredict_Underdog(t *testing.T) {
 }
 
 func TestPredict_NoData(t *testing.T) {
-	p := Predict(Input{})
+	p := Predict(Input{}, DefaultWeights())
 
 	if p.WinProbability < 0.05 || p.WinProbability > 0.95 {
 		t.Errorf("probability out of bounds: %f", p.WinProbability)
@@ -72,7 +72,7 @@ func TestPredict_NoData(t *testing.T) {
 }
 
 func TestPredict_OnlyHoroscope(t *testing.T) {
-	p := Predict(Input{HoroscopeText: "A glorious day of cosmic triumph"})
+	p := Predict(Input{HoroscopeText: "A glorious day of cosmic triumph"}, DefaultWeights())
 
 	if p.WinProbability < 0.05 || p.WinProbability > 0.95 {
 		t.Errorf("probability out of bounds: %f", p.WinProbability)
@@ -89,7 +89,7 @@ func TestPredict_EarlySeason(t *testing.T) {
 		HoroscopeText: "New beginnings favor the bold",
 	}
 
-	p := Predict(in)
+	p := Predict(in, DefaultWeights())
 
 	// Should still produce a valid prediction
 	if p.WinProbability < 0.05 || p.WinProbability > 0.95 {
@@ -112,7 +112,7 @@ func TestPredict_Clamped(t *testing.T) {
 		HoroscopeText:   "Absolute perfection awaits",
 	}
 
-	p := Predict(in)
+	p := Predict(in, DefaultWeights())
 	if p.WinProbability > 0.95 {
 		t.Errorf("probability should be clamped to 0.95, got %f", p.WinProbability)
 	}

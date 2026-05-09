@@ -28,15 +28,18 @@ func TestCalculateFactorAccuracy(t *testing.T) {
 		},
 	}
 
-	accuracy := CalculateFactorAccuracy(predictions)
+	accuracy, samples := CalculateFactorAccuracy(predictions)
 
 	if len(accuracy) == 0 {
 		t.Error("expected accuracy map to have entries")
 	}
+	if samples["winRate"] != 4 {
+		t.Errorf("expected 4 winRate samples, got %d", samples["winRate"])
+	}
 }
 
 func TestCalculateFactorAccuracy_EmptyPredictions(t *testing.T) {
-	accuracy := CalculateFactorAccuracy(nil)
+	accuracy, _ := CalculateFactorAccuracy(nil)
 	if accuracy == nil {
 		t.Error("expected map returned")
 	}
@@ -49,68 +52,96 @@ func TestCalculateFactorAccuracy_NoActuals(t *testing.T) {
 	predictions := []PredictionRecord{
 		{
 			Predicted: "W",
-			Actual:   "", // no result yet
+			Actual:   "",
 			Factors: FactorScores{WinRate: 0.6},
 		},
 	}
-	accuracy := CalculateFactorAccuracy(predictions)
+	accuracy, _ := CalculateFactorAccuracy(predictions)
 	if len(accuracy) == 0 {
 		t.Error("expected map returned")
 	}
 }
 
 func TestAdjustWeights(t *testing.T) {
-	current := Weights{
-		WinRate: 0.30,
-		Pitcher: 0.30,
-		H2H:     0.15,
-		HomeAway: 0.10,
-		Momentum: 0.05,
-		Stars:    0.10,
-	}
+	current := DefaultWeights()
 
 	accuracy := map[string]float64{
-		"winRate":   0.60, // good
-		"pitcher":  0.40, // bad
-		"h2h":      0.50, // neutral
+		"winRate":  0.70,
+		"pitcher":  0.30,
+		"h2h":     0.50,
+		"homeAway": 0.50,
+		"momentum": 0.50,
+		"stars":    0.50,
+	}
+	samples := map[string]int{
+		"winRate": 10, "pitcher": 10, "h2h": 10,
+		"homeAway": 10, "momentum": 10, "stars": 10,
 	}
 
-	newWeights := AdjustWeights(current, accuracy, 10)
+	newWeights := AdjustWeights(current, accuracy, samples, 25)
 
 	if newWeights.WinRate <= current.WinRate {
-		t.Errorf("good factor should increase: winRate %f -> %f", current.WinRate, newWeights.WinRate)
+		t.Errorf("accurate factor should increase: winRate %f -> %f", current.WinRate, newWeights.WinRate)
 	}
 	if newWeights.Pitcher >= current.Pitcher {
-		t.Errorf("bad factor should decrease: pitcher %f -> %f", current.Pitcher, newWeights.Pitcher)
+		t.Errorf("inaccurate factor should decrease: pitcher %f -> %f", current.Pitcher, newWeights.Pitcher)
 	}
 }
 
-func TestAdjustWeights_SmallSample(t *testing.T) {
-	current := Weights{WinRate: 0.30, Pitcher: 0.30}
+func TestAdjustWeights_TooFewGames(t *testing.T) {
+	current := DefaultWeights()
 
-	accuracy := map[string]float64{
-		"winRate": 0.70, // good
-		"pitcher": 0.40, // bad
-	}
+	accuracy := map[string]float64{"winRate": 0.90, "pitcher": 0.10}
+	samples := map[string]int{"winRate": 3, "pitcher": 3}
 
-	newWeights := AdjustWeights(current, accuracy, 2)
-	if newWeights.WinRate == current.WinRate {
-		t.Errorf("should adjust with < 3 predictions, got %f", newWeights.WinRate)
+	newWeights := AdjustWeights(current, accuracy, samples, 3)
+	if newWeights.WinRate != current.WinRate {
+		t.Errorf("should not adjust with < 5 total games: %f -> %f", current.WinRate, newWeights.WinRate)
 	}
 }
 
-func TestAdjustWeights_Bounds(t *testing.T) {
-	current := Weights{WinRate: 0.40, Pitcher: 0.10}
+func TestAdjustWeights_MinSamplesPerFactor(t *testing.T) {
+	current := DefaultWeights()
 
 	accuracy := map[string]float64{
-		"winRate": 0.70, // good - should increase
-		"pitcher": 0.40, // bad - should decrease
+		"winRate": 0.80, "pitcher": 0.80,
+		"h2h": 0.80, "homeAway": 0.50,
+		"momentum": 0.50, "stars": 0.50,
+	}
+	samples := map[string]int{
+		"winRate": 10, "pitcher": 10,
+		"h2h": 2, "homeAway": 10,
+		"momentum": 10, "stars": 10,
 	}
 
-	newWeights := AdjustWeights(current, accuracy, 10)
-	// With both good and bad factors, should rebalance
-	if newWeights.WinRate == current.WinRate && newWeights.Pitcher == current.Pitcher {
-		t.Error("weights should rebalance with both good and bad factors")
+	newWeights := AdjustWeights(current, accuracy, samples, 10)
+	// H2H has too few samples — should regularize toward default, not boost
+	if newWeights.H2H > current.H2H+0.01 {
+		t.Errorf("factor with < 5 samples should not get boosted: h2h %f -> %f", current.H2H, newWeights.H2H)
+	}
+}
+
+func TestAdjustWeights_DecayingLearningRate(t *testing.T) {
+	current := DefaultWeights()
+
+	accuracy := map[string]float64{
+		"winRate": 0.80, "pitcher": 0.50,
+		"h2h": 0.50, "homeAway": 0.50,
+		"momentum": 0.50, "stars": 0.50,
+	}
+	samples := map[string]int{
+		"winRate": 20, "pitcher": 20,
+		"h2h": 20, "homeAway": 20,
+		"momentum": 20, "stars": 20,
+	}
+
+	early := AdjustWeights(current, accuracy, samples, 10)
+	late := AdjustWeights(current, accuracy, samples, 100)
+
+	earlyShift := early.WinRate - current.WinRate
+	lateShift := late.WinRate - current.WinRate
+	if lateShift >= earlyShift {
+		t.Errorf("later adjustments should be smaller: early=%f late=%f", earlyShift, lateShift)
 	}
 }
 

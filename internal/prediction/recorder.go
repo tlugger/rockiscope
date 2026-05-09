@@ -3,6 +3,7 @@ package prediction
 import (
 	"encoding/json"
 	"fmt"
+	"math"
 	"os"
 	"path/filepath"
 	"sort"
@@ -12,12 +13,12 @@ const historyFileName = "prediction_history.json"
 
 var (
 	defaultWeights = Weights{
-		WinRate:   0.30,
-		Pitcher:   0.30,
-		H2H:       0.15,
-		HomeAway:  0.10,
-		Momentum: 0.05,
-		Stars:     0.10,
+		WinRate:  0.25,
+		Pitcher:  0.35,
+		H2H:     0.05,
+		HomeAway: 0.15,
+		Momentum: 0.10,
+		Stars:    0.10,
 	}
 )
 
@@ -82,7 +83,7 @@ func (h *PredictionHistory) Recent(n int) []PredictionRecord {
 	return h.Predictions[len(h.Predictions)-n:]
 }
 
-func (h *PredictionHistory) completed() []PredictionRecord {
+func (h *PredictionHistory) Completed() []PredictionRecord {
 	var completed []PredictionRecord
 	for _, p := range h.Predictions {
 		if p.Actual != "" {
@@ -94,7 +95,7 @@ func (h *PredictionHistory) completed() []PredictionRecord {
 
 func (h *PredictionHistory) CorrectCount() int {
 	count := 0
-	for _, p := range h.completed() {
+	for _, p := range h.Completed() {
 		if p.Predicted == p.Actual {
 			count++
 		}
@@ -103,7 +104,7 @@ func (h *PredictionHistory) CorrectCount() int {
 }
 
 func (h *PredictionHistory) TotalCount() int {
-	return len(h.completed())
+	return len(h.Completed())
 }
 
 func LoadHistory(dataDir string) (*PredictionHistory, error) {
@@ -159,122 +160,118 @@ func SaveHistory(h *PredictionHistory, dataDir string) error {
 	return nil
 }
 
-func CalculateFactorAccuracy(predictions []PredictionRecord) map[string]float64 {
+// CalculateFactorAccuracy checks whether each factor's score (>0.5 or <0.5)
+// aligned with the actual game outcome, not the prediction.
+// Returns accuracy (0-1) and sample counts per factor.
+func CalculateFactorAccuracy(predictions []PredictionRecord) (accuracy map[string]float64, sampleCounts map[string]int) {
 	factors := []string{"winRate", "pitcher", "h2h", "homeAway", "momentum", "stars"}
-	accuracy := make(map[string]float64)
+	accuracy = make(map[string]float64)
+	sampleCounts = make(map[string]int)
 	correct := make(map[string]int)
-	total := make(map[string]int)
 
 	for _, p := range predictions {
 		if p.Actual == "" {
 			continue
 		}
+		won := p.Actual == "W"
+		fc := p.Factors
 
-		direction := 1.0
-		if p.Actual == "L" {
-			direction = -1.0
+		check := func(name string, score float64) {
+			sampleCounts[name]++
+			if (score > 0.5) == won {
+				correct[name]++
+			}
 		}
 
-		fc := p.Factors
 		if fc.WinRate != 0 {
-			correctDir := (fc.WinRate*direction > 0.5)
-			total["winRate"]++
-			if correctDir == (p.Actual == p.Predicted) {
-				correct["winRate"]++
-			}
+			check("winRate", fc.WinRate)
 		}
 		if fc.Pitcher != 0 {
-			total["pitcher"]++
-			if (fc.Pitcher > 0.5) == (p.Predicted == "W") {
-				correct["pitcher"]++
-			}
+			check("pitcher", fc.Pitcher)
 		}
 		if fc.H2H != 0 {
-			total["h2h"]++
-			if (fc.H2H > 0.5) == (p.Predicted == "W") {
-				correct["h2h"]++
-			}
+			check("h2h", fc.H2H)
 		}
 		if fc.HomeAway != 0 {
-			total["homeAway"]++
-			if (fc.HomeAway > 0.5) == (p.Predicted == "W") {
-				correct["homeAway"]++
-			}
+			check("homeAway", fc.HomeAway)
 		}
 		if fc.Momentum != 0 {
-			total["momentum"]++
-			if (fc.Momentum > 0.5) == (p.Predicted == "W") {
-				correct["momentum"]++
-			}
+			check("momentum", fc.Momentum)
 		}
 		if fc.Stars != 0 {
-			total["stars"]++
-			if (fc.Stars > 0.5) == (p.Predicted == "W") {
-				correct["stars"]++
-			}
+			check("stars", fc.Stars)
 		}
 	}
 
 	for _, f := range factors {
-		if total[f] == 0 {
+		if sampleCounts[f] == 0 {
 			accuracy[f] = 0.5
 		} else {
-			accuracy[f] = float64(correct[f]) / float64(total[f])
+			accuracy[f] = float64(correct[f]) / float64(sampleCounts[f])
 		}
 	}
 
-	return accuracy
+	return accuracy, sampleCounts
 }
 
-func AdjustWeights(current Weights, accuracy map[string]float64, n int) Weights {
-	adjusted := current
-
-	goodFactors := []string{}
-	badFactors := []string{}
-
-	for f, acc := range accuracy {
-		if acc > 0.55 {
-			goodFactors = append(goodFactors, f)
-		} else if acc < 0.45 {
-			badFactors = append(badFactors, f)
-		}
+// AdjustWeights updates weights using a conservative approach:
+//   - Decaying learning rate: smaller adjustments as more games are seen
+//   - Regularization: pulls weights back toward defaults to prevent runaway drift
+//   - Minimum sample: only adjusts factors with enough observations
+//
+// accuracy maps factor names to their accuracy (0-1) against actual outcomes.
+// sampleCounts maps factor names to how many games had that factor available.
+// totalGames is the cumulative number of completed games (used to decay the learning rate).
+func AdjustWeights(current Weights, accuracy map[string]float64, sampleCounts map[string]int, totalGames int) Weights {
+	if totalGames < 5 {
+		return current
 	}
 
-	shift := 0.03
-	if len(goodFactors) > 0 && len(badFactors) > 0 {
-		shiftPerFactor := shift / float64(len(goodFactors))
-		for _, f := range goodFactors {
-			switch f {
-			case "winRate":
-				adjusted.WinRate = min(0.45, adjusted.WinRate+shiftPerFactor)
-			case "pitcher":
-				adjusted.Pitcher = min(0.45, adjusted.Pitcher+shiftPerFactor)
-			case "h2h":
-				adjusted.H2H = min(0.25, adjusted.H2H+shiftPerFactor)
-			case "homeAway":
-				adjusted.HomeAway = min(0.20, adjusted.HomeAway+shiftPerFactor)
-			case "momentum":
-				adjusted.Momentum = min(0.15, adjusted.Momentum+shiftPerFactor)
-			case "stars":
-				adjusted.Stars = min(0.20, adjusted.Stars+shiftPerFactor)
-			}
+	learningRate := 0.15 / math.Sqrt(float64(totalGames))
+	regularization := 0.02
+	minSamples := 5
+
+	type factorCfg struct {
+		name     string
+		get      func(Weights) float64
+		set      func(*Weights, float64)
+		floor    float64
+		ceiling  float64
+	}
+
+	factors := []factorCfg{
+		{"winRate", func(w Weights) float64 { return w.WinRate }, func(w *Weights, v float64) { w.WinRate = v }, 0.10, 0.40},
+		{"pitcher", func(w Weights) float64 { return w.Pitcher }, func(w *Weights, v float64) { w.Pitcher = v }, 0.10, 0.45},
+		{"h2h", func(w Weights) float64 { return w.H2H }, func(w *Weights, v float64) { w.H2H = v }, 0.02, 0.15},
+		{"homeAway", func(w Weights) float64 { return w.HomeAway }, func(w *Weights, v float64) { w.HomeAway = v }, 0.05, 0.25},
+		{"momentum", func(w Weights) float64 { return w.Momentum }, func(w *Weights, v float64) { w.Momentum = v }, 0.03, 0.20},
+		{"stars", func(w Weights) float64 { return w.Stars }, func(w *Weights, v float64) { w.Stars = v }, 0.03, 0.15},
+	}
+
+	adjusted := current
+	defaults := defaultWeights
+
+	for _, f := range factors {
+		cur := f.get(adjusted)
+		def := f.get(defaults)
+
+		acc, hasAcc := accuracy[f.name]
+		samples := sampleCounts[f.name]
+
+		if !hasAcc || samples < minSamples {
+			// Not enough data — regularize toward default only
+			cur += regularization * (def - cur)
+		} else {
+			// Shift proportional to how far accuracy deviates from 0.5
+			signal := (acc - 0.5) * 2 // range [-1, 1]
+			cur += learningRate * signal
+
+			// Regularize toward default
+			cur += regularization * (def - cur)
 		}
-		for _, f := range badFactors {
-			switch f {
-			case "winRate":
-				adjusted.WinRate = max(0.10, adjusted.WinRate-shiftPerFactor)
-			case "pitcher":
-				adjusted.Pitcher = max(0.10, adjusted.Pitcher-shiftPerFactor)
-			case "h2h":
-				adjusted.H2H = max(0.02, adjusted.H2H-shiftPerFactor)
-			case "homeAway":
-				adjusted.HomeAway = max(0.02, adjusted.HomeAway-shiftPerFactor)
-			case "momentum":
-				adjusted.Momentum = max(0.01, adjusted.Momentum-shiftPerFactor)
-			case "stars":
-				adjusted.Stars = max(0.02, adjusted.Stars-shiftPerFactor)
-			}
-		}
+
+		cur = math.Max(f.floor, math.Min(f.ceiling, cur))
+		f.set(&adjusted, cur)
 	}
 
 	total := adjusted.total()
@@ -290,19 +287,6 @@ func AdjustWeights(current Weights, accuracy map[string]float64, n int) Weights 
 	return adjusted
 }
 
-func max(a, b float64) float64 {
-	if a > b {
-		return a
-	}
-	return b
-}
-
-func min(a, b float64) float64 {
-	if a < b {
-		return a
-	}
-	return b
-}
 
 type byDate []PredictionRecord
 
