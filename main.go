@@ -5,10 +5,13 @@ import (
 	"log"
 	"os"
 
+	"net/http"
+
 	"github.com/tlugger/rockiscope/internal/bluesky"
 	"github.com/tlugger/rockiscope/internal/horoscope"
 	"github.com/tlugger/rockiscope/internal/mlb"
 	"github.com/tlugger/rockiscope/internal/scheduler"
+	"github.com/tlugger/rockiscope/internal/web"
 )
 
 var version = "dev"
@@ -20,6 +23,7 @@ Usage:
 
 Commands:
   run          Start the scheduler daemon (default if no command given)
+  serve        Start the analytics dashboard web server
   post         Force a post right now, skipping the schedule
   preview      Fetch all data and print the post without posting
   test-auth    Test Bluesky authentication
@@ -44,6 +48,8 @@ func main() {
 	switch cmd {
 	case "run":
 		cmdRun(logger)
+	case "serve":
+		cmdServe(logger)
 	case "post":
 		cmdPost(logger)
 	case "preview":
@@ -67,9 +73,36 @@ func main() {
 
 func cmdRun(logger *log.Logger) {
 	logger.Printf("starting rockiscope %s", version)
+
+	addr := ":8086"
+	if port := os.Getenv("ROCKISCOPE_PORT"); port != "" {
+		addr = ":" + port
+	}
+	dataDir := getDataDir()
+	srv := web.NewServer(dataDir, logger)
+	go func() {
+		logger.Printf("analytics dashboard at http://localhost%s", addr)
+		if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
+			logger.Printf("warning: dashboard server error: %v", err)
+		}
+	}()
+
 	poster := mustAuthBluesky(logger)
 	sched := newScheduler(logger, poster)
 	sched.Run()
+}
+
+func cmdServe(logger *log.Logger) {
+	addr := ":8086"
+	if port := os.Getenv("ROCKISCOPE_PORT"); port != "" {
+		addr = ":" + port
+	}
+	dataDir := getDataDir()
+	srv := web.NewServer(dataDir, logger)
+	logger.Printf("analytics dashboard at http://localhost%s", addr)
+	if err := http.ListenAndServe(addr, srv.Handler()); err != nil {
+		logger.Fatalf("server error: %v", err)
+	}
 }
 
 func cmdPost(logger *log.Logger) {

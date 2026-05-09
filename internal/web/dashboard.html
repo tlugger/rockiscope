@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Rockiscope Analytics</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg-top: #190F32;
+    --bg-bottom: #2D1450;
+    --text: #E6DCFF;
+    --text-dim: rgba(230,220,255,0.5);
+    --accent: #C8AAFF;
+    --card-bg: rgba(255,255,255,0.04);
+    --card-border: rgba(255,255,255,0.08);
+    --green: #7BE0AD;
+    --red: #FF8A9B;
+    --yellow: #FFD07B;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: system-ui, -apple-system, sans-serif;
+    background: linear-gradient(180deg, var(--bg-top) 0%, var(--bg-bottom) 100%);
+    background-attachment: fixed;
+    color: var(--text);
+    min-height: 100vh;
+    padding: 24px;
+  }
+  header {
+    text-align: center;
+    padding: 32px 0 24px;
+  }
+  header h1 {
+    font-size: 28px;
+    font-weight: 700;
+    color: var(--accent);
+    letter-spacing: 0.5px;
+  }
+  header p { color: var(--text-dim); font-size: 14px; margin-top: 6px; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    max-width: 1200px;
+    margin: 0 auto 20px;
+  }
+  .stat-card {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 20px;
+    text-align: center;
+  }
+  .stat-card .value {
+    font-size: 32px;
+    font-weight: 700;
+    color: var(--accent);
+  }
+  .stat-card .label {
+    font-size: 12px;
+    color: var(--text-dim);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-top: 4px;
+  }
+
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    max-width: 1200px;
+    margin: 0 auto 20px;
+  }
+  .grid .wide { grid-column: 1 / -1; }
+
+  .panel {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .panel h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    margin-bottom: 16px;
+  }
+  .panel { overflow: hidden; min-width: 0; }
+  .chart-wrap { position: relative; overflow: hidden; width: 100%; }
+
+  .game-log {
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+  .filter-bar {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+  .filter-bar .chip {
+    font-size: 12px;
+    padding: 4px 12px;
+    border-radius: 20px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .filter-bar .chip:hover, .filter-bar .chip.active {
+    background: rgba(200,170,255,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    color: var(--text-dim);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    font-size: 11px;
+    padding: 8px 12px;
+    border-bottom: 1px solid var(--card-border);
+  }
+  td {
+    padding: 8px 12px;
+    border-bottom: 1px solid rgba(255,255,255,0.03);
+  }
+  tr:hover td { background: rgba(255,255,255,0.03); }
+  .correct { color: var(--green); }
+  .wrong { color: var(--red); }
+  .pending { color: var(--text-dim); font-style: italic; }
+  .tag {
+    display: inline-block;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-weight: 600;
+  }
+  .tag-w { background: rgba(123,224,173,0.15); color: var(--green); }
+  .tag-l { background: rgba(255,138,155,0.15); color: var(--red); }
+  .tag-na { background: rgba(255,255,255,0.05); color: var(--text-dim); }
+
+  .pagination {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 4px;
+    padding: 16px 0 4px;
+  }
+  .pagination button {
+    background: var(--card-bg);
+    border: 1px solid var(--card-border);
+    color: var(--text);
+    font-size: 13px;
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .pagination button:hover { border-color: var(--accent); color: var(--accent); }
+  .pagination button.active { background: rgba(200,170,255,0.15); border-color: var(--accent); color: var(--accent); }
+  .pagination button:disabled { opacity: 0.3; cursor: default; }
+  .pagination .page-info { color: var(--text-dim); font-size: 12px; padding: 0 8px; }
+
+  .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+  @media (max-width: 768px) {
+    body { padding: 10px; }
+    header { padding: 20px 0 16px; }
+    header h1 { font-size: 22px; }
+    header p { font-size: 12px; }
+    .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
+    .stat-card { padding: 14px 10px; }
+    .stat-card .value { font-size: 24px; }
+    .stat-card .label { font-size: 10px; }
+    .grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 14px; }
+    .panel { padding: 14px; border-radius: 10px; }
+    .panel h2 { font-size: 12px; margin-bottom: 10px; }
+    .chart-wrap { height: 220px !important; }
+    .filter-bar { gap: 6px; }
+    .filter-bar .chip { font-size: 11px; padding: 6px 10px; }
+    table { font-size: 12px; }
+    th, td { padding: 6px 6px; }
+    th { font-size: 10px; }
+    .pagination button { padding: 8px 14px; font-size: 14px; }
+    .pagination { gap: 6px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <h1>Rockiscope Analytics</h1>
+  <p>Colorado Rockies prediction performance &mdash; powered by the cosmos</p>
+</header>
+
+<div class="stats-row" id="statsRow"></div>
+
+<div class="grid">
+  <div class="panel wide">
+    <h2>Prediction Accuracy Over Time</h2>
+    <div class="chart-wrap" style="height:280px"><canvas id="accuracyChart"></canvas></div>
+  </div>
+  <div class="panel">
+    <h2>Confidence Calibration</h2>
+    <div class="chart-wrap" style="height:260px"><canvas id="calibrationChart"></canvas></div>
+  </div>
+  <div class="panel">
+    <h2>Factor Accuracy vs Actual Outcomes</h2>
+    <div class="chart-wrap" style="height:260px"><canvas id="factorChart"></canvas></div>
+  </div>
+  <div class="panel">
+    <h2>Current Factor Weights</h2>
+    <div class="chart-wrap" style="height:260px"><canvas id="weightsChart"></canvas></div>
+  </div>
+  <div class="panel">
+    <h2>Record by Opponent</h2>
+    <div class="chart-wrap" style="height:260px"><canvas id="opponentChart"></canvas></div>
+  </div>
+</div>
+
+<div class="game-log panel">
+  <h2>Game Log</h2>
+  <div class="filter-bar" id="filterBar">
+    <span class="chip active" data-filter="all">All</span>
+  </div>
+  <div class="table-scroll">
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Opponent</th>
+        <th>H/A</th>
+        <th>Predicted</th>
+        <th>Actual</th>
+        <th>Win Prob</th>
+        <th>Result</th>
+      </tr>
+    </thead>
+    <tbody id="logBody"></tbody>
+  </table>
+  </div>
+  <div class="pagination" id="pagination"></div>
+</div>
+
+<script>
+const COLORS = {
+  accent: '#C8AAFF',
+  accentDim: 'rgba(200,170,255,0.3)',
+  green: '#7BE0AD',
+  greenDim: 'rgba(123,224,173,0.2)',
+  red: '#FF8A9B',
+  redDim: 'rgba(255,138,155,0.2)',
+  yellow: '#FFD07B',
+  text: '#E6DCFF',
+  textDim: 'rgba(230,220,255,0.4)',
+  grid: 'rgba(255,255,255,0.06)',
+  factors: ['#C8AAFF','#7BE0AD','#FF8A9B','#FFD07B','#82B1FF','#FF80AB']
+};
+
+const CHART_DEFAULTS = {
+  responsive: true,
+  maintainAspectRatio: false,
+  plugins: {
+    legend: { labels: { color: COLORS.textDim, font: { size: 11 } } },
+    tooltip: {
+      backgroundColor: '#1E1240',
+      borderColor: 'rgba(200,170,255,0.3)',
+      borderWidth: 1,
+      titleColor: COLORS.accent,
+      bodyColor: COLORS.text,
+      cornerRadius: 8,
+      padding: 10,
+    }
+  },
+  scales: {
+    x: { ticks: { color: COLORS.textDim, font: { size: 10 } }, grid: { color: COLORS.grid } },
+    y: { ticks: { color: COLORS.textDim, font: { size: 10 } }, grid: { color: COLORS.grid } }
+  }
+};
+
+let allGames = [];
+let activeFilter = 'all';
+let currentPage = 1;
+let filteredGames = [];
+const PAGE_SIZE = 20;
+
+const TEAM_ABBR = {
+  'Arizona Diamondbacks': 'ARI', 'Atlanta Braves': 'ATL', 'Baltimore Orioles': 'BAL',
+  'Boston Red Sox': 'BOS', 'Chicago Cubs': 'CHC', 'Chicago White Sox': 'CWS',
+  'Cincinnati Reds': 'CIN', 'Cleveland Guardians': 'CLE', 'Colorado Rockies': 'COL',
+  'Detroit Tigers': 'DET', 'Houston Astros': 'HOU', 'Kansas City Royals': 'KC',
+  'Los Angeles Angels': 'LAA', 'Los Angeles Dodgers': 'LAD', 'Miami Marlins': 'MIA',
+  'Milwaukee Brewers': 'MIL', 'Minnesota Twins': 'MIN', 'New York Mets': 'NYM',
+  'New York Yankees': 'NYY', 'Oakland Athletics': 'OAK', 'Philadelphia Phillies': 'PHI',
+  'Pittsburgh Pirates': 'PIT', 'San Diego Padres': 'SD', 'San Francisco Giants': 'SF',
+  'Seattle Mariners': 'SEA', 'St. Louis Cardinals': 'STL', 'Tampa Bay Rays': 'TB',
+  'Texas Rangers': 'TEX', 'Toronto Blue Jays': 'TOR', 'Washington Nationals': 'WSH',
+};
+function isMobile() { return window.innerWidth < 768; }
+function teamName(full) { return isMobile() ? (TEAM_ABBR[full] || full) : full; }
+
+async function init() {
+  const resp = await fetch('/api/predictions');
+  const data = await resp.json();
+
+  const games = (data.predictions || []).filter(p => p.predicted !== 'N/A');
+  const completed = games.filter(g => g.actual);
+  allGames = games;
+
+  renderStats(completed, data.currentWeights);
+  renderAccuracyChart(completed);
+  renderCalibrationChart(completed);
+  renderFactorChart(completed);
+  renderWeightsChart(data.currentWeights);
+  renderOpponentChart(completed);
+  renderGameLog(games);
+}
+
+function renderStats(completed, weights) {
+  const correct = completed.filter(g => g.predicted === g.actual).length;
+  const total = completed.length;
+  const pct = total ? ((correct / total) * 100).toFixed(1) : '—';
+  const wins = completed.filter(g => g.actual === 'W').length;
+  const losses = completed.filter(g => g.actual === 'L').length;
+
+  const recent = completed.slice(-10);
+  const recentCorrect = recent.filter(g => g.predicted === g.actual).length;
+  const recentPct = recent.length ? ((recentCorrect / recent.length) * 100).toFixed(0) : '—';
+
+  document.getElementById('statsRow').innerHTML = `
+    <div class="stat-card"><div class="value">${correct}-${total - correct}</div><div class="label">Prediction Record</div></div>
+    <div class="stat-card"><div class="value">${pct}%</div><div class="label">Overall Accuracy</div></div>
+    <div class="stat-card"><div class="value">${wins}-${losses}</div><div class="label">Rockies Record</div></div>
+    <div class="stat-card"><div class="value">${recentPct}%</div><div class="label">Last 10 Accuracy</div></div>
+  `;
+}
+
+function renderAccuracyChart(completed) {
+  const labels = [];
+  const cumAcc = [];
+  const rollingAcc = [];
+  let correct = 0;
+
+  completed.forEach((g, i) => {
+    if (g.predicted === g.actual) correct++;
+    labels.push(g.date.slice(5)); // MM-DD
+    cumAcc.push(((correct / (i + 1)) * 100).toFixed(1));
+
+    const windowSize = Math.min(10, i + 1);
+    const window = completed.slice(Math.max(0, i - 9), i + 1);
+    const windowCorrect = window.filter(w => w.predicted === w.actual).length;
+    rollingAcc.push(((windowCorrect / windowSize) * 100).toFixed(1));
+  });
+
+  new Chart(document.getElementById('accuracyChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Cumulative %',
+          data: cumAcc,
+          borderColor: COLORS.accent,
+          backgroundColor: COLORS.accentDim,
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+          pointHoverRadius: 6,
+          pointBackgroundColor: completed.map(g => g.predicted === g.actual ? COLORS.green : COLORS.red),
+        },
+        {
+          label: 'Rolling 10-game %',
+          data: rollingAcc,
+          borderColor: COLORS.yellow,
+          borderDash: [5, 3],
+          tension: 0.3,
+          pointRadius: 0,
+          fill: false,
+        },
+        {
+          label: '50% baseline',
+          data: cumAcc.map(() => 50),
+          borderColor: COLORS.textDim,
+          borderDash: [2, 4],
+          pointRadius: 0,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      onClick: (e, elements) => {
+        if (elements.length > 0) {
+          const idx = elements[0].index;
+          const game = completed[idx];
+          filterLog(game.opponent);
+        }
+      },
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        legend: { labels: { color: COLORS.textDim, font: { size: 11 }, usePointStyle: true, pointStyle: 'line' } },
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: {
+            afterTitle: (items) => {
+              const g = completed[items[0].dataIndex];
+              return `${g.opponent} — ${g.predicted === g.actual ? 'Correct' : 'Wrong'}`;
+            }
+          }
+        }
+      },
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } }
+      }
+    }
+  });
+}
+
+function renderCalibrationChart(completed) {
+  const buckets = {};
+  [[0, 35, '<35%'], [35, 45, '35-45%'], [45, 55, '45-55%'], [55, 65, '55-65%'], [65, 100, '>65%']].forEach(([lo, hi, label]) => {
+    buckets[label] = { correct: 0, total: 0, lo, hi };
+  });
+
+  completed.forEach(g => {
+    const conf = g.winProbability * 100;
+    const predConf = g.predicted === 'W' ? conf : 100 - conf;
+    for (const [label, b] of Object.entries(buckets)) {
+      if (predConf >= b.lo && predConf < b.hi) {
+        b.total++;
+        if (g.predicted === g.actual) b.correct++;
+        break;
+      }
+    }
+  });
+
+  const labels = Object.keys(buckets);
+  const accuracy = labels.map(l => buckets[l].total ? ((buckets[l].correct / buckets[l].total) * 100).toFixed(1) : 0);
+  const counts = labels.map(l => buckets[l].total);
+
+  new Chart(document.getElementById('calibrationChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Accuracy %',
+          data: accuracy,
+          backgroundColor: labels.map((_, i) => COLORS.factors[i % COLORS.factors.length] + '66'),
+          borderColor: labels.map((_, i) => COLORS.factors[i % COLORS.factors.length]),
+          borderWidth: 1,
+          yAxisID: 'y',
+        },
+        {
+          label: 'Game Count',
+          data: counts,
+          type: 'line',
+          borderColor: COLORS.textDim,
+          pointBackgroundColor: COLORS.text,
+          pointRadius: 4,
+          fill: false,
+          yAxisID: 'y1',
+        }
+      ]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      scales: {
+        x: CHART_DEFAULTS.scales.x,
+        y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } },
+        y1: { position: 'right', grid: { display: false }, ticks: { color: COLORS.textDim, font: { size: 10 } } }
+      }
+    }
+  });
+}
+
+function renderFactorChart(completed) {
+  const factorNames = ['winRate', 'pitcher', 'h2h', 'homeAway', 'momentum', 'stars'];
+  const labels = ['Win Rate', 'Pitcher', 'H2H', 'Home/Away', 'Momentum', 'Stars'];
+  const correct = {};
+  const total = {};
+  factorNames.forEach(f => { correct[f] = 0; total[f] = 0; });
+
+  completed.forEach(g => {
+    const won = g.actual === 'W';
+    const fc = g.factors || {};
+    factorNames.forEach(f => {
+      const v = fc[f];
+      if (v && v !== 0) {
+        total[f]++;
+        if ((v > 0.5) === won) correct[f]++;
+      }
+    });
+  });
+
+  const accuracy = factorNames.map(f => total[f] ? ((correct[f] / total[f]) * 100).toFixed(1) : 50);
+
+  new Chart(document.getElementById('factorChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Accuracy %',
+        data: accuracy,
+        backgroundColor: COLORS.factors.map(c => c + '55'),
+        borderColor: COLORS.factors,
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      indexAxis: 'y',
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        legend: { display: false },
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: {
+            afterLabel: (item) => `${total[factorNames[item.dataIndex]]} games with data`
+          }
+        }
+      },
+      scales: {
+        x: { ...CHART_DEFAULTS.scales.x, min: 0, max: 100, ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' } },
+        y: { ...CHART_DEFAULTS.scales.y, grid: { display: false } }
+      }
+    }
+  });
+}
+
+function renderWeightsChart(weights) {
+  if (!weights || Object.keys(weights).length === 0) return;
+
+  const labels = ['Win Rate', 'Pitcher', 'H2H', 'Home/Away', 'Momentum', 'Stars'];
+  const keys = ['winRate', 'pitcher', 'h2h', 'homeAway', 'momentum', 'stars'];
+  const data = keys.map(k => ((weights[k] || 0) * 100).toFixed(1));
+  const mobile = window.innerWidth < 768;
+
+  new Chart(document.getElementById('weightsChart'), {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: COLORS.factors.map(c => c + '88'),
+        borderColor: COLORS.factors,
+        borderWidth: 1,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: mobile ? 'bottom' : 'right',
+          labels: { color: COLORS.textDim, font: { size: mobile ? 10 : 11 }, padding: mobile ? 8 : 12 }
+        },
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: { label: (item) => `${item.label}: ${item.raw}%` }
+        }
+      }
+    }
+  });
+}
+
+function renderOpponentChart(completed) {
+  const opponents = {};
+  completed.forEach(g => {
+    if (!opponents[g.opponent]) opponents[g.opponent] = { correct: 0, wrong: 0 };
+    if (g.predicted === g.actual) opponents[g.opponent].correct++;
+    else opponents[g.opponent].wrong++;
+  });
+
+  const sorted = Object.entries(opponents).sort((a, b) => (b[1].correct + b[1].wrong) - (a[1].correct + a[1].wrong));
+  const shorten = name => name.replace(/^(Los Angeles|San Diego|San Francisco|New York) /, (_, c) =>
+    ({  'Los Angeles': 'LA ', 'San Diego': 'SD ', 'San Francisco': 'SF ', 'New York': 'NY ' })[c] || c + ' ');
+  const mobile = window.innerWidth < 768;
+  const labels = sorted.map(([name]) => mobile ? shorten(name) : name);
+
+  new Chart(document.getElementById('opponentChart'), {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Correct',
+          data: sorted.map(([, v]) => v.correct),
+          backgroundColor: COLORS.green + '88',
+          borderColor: COLORS.green,
+          borderWidth: 1,
+        },
+        {
+          label: 'Wrong',
+          data: sorted.map(([, v]) => v.wrong),
+          backgroundColor: COLORS.red + '55',
+          borderColor: COLORS.red,
+          borderWidth: 1,
+        }
+      ]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        legend: { labels: { color: COLORS.textDim, font: { size: 11 } } }
+      },
+      scales: {
+        ...CHART_DEFAULTS.scales,
+        x: { ...CHART_DEFAULTS.scales.x, stacked: true },
+        y: { ...CHART_DEFAULTS.scales.y, stacked: true, ticks: { ...CHART_DEFAULTS.scales.y.ticks, stepSize: 1 } }
+      },
+      onClick: (e, elements) => {
+        if (elements.length > 0) {
+          filterLog(sorted[elements[0].index][0]);
+        }
+      }
+    }
+  });
+}
+
+function renderGameLog(games) {
+  const filterBar = document.getElementById('filterBar');
+  const opponents = [...new Set(games.filter(g => g.actual).map(g => g.opponent))];
+  opponents.forEach(opp => {
+    const chip = document.createElement('span');
+    chip.className = 'chip';
+    chip.dataset.filter = opp;
+    chip.textContent = opp.replace(/^(Los Angeles|San Diego|San Francisco|New York) /, (_, city) => {
+      return { 'Los Angeles': 'LA ', 'San Diego': 'SD ', 'San Francisco': 'SF ', 'New York': 'NY ' }[city] || city + ' ';
+    });
+    chip.onclick = () => filterLog(opp);
+    filterBar.appendChild(chip);
+  });
+
+  document.querySelector('[data-filter="all"]').onclick = () => filterLog('all');
+  filterLog('all');
+}
+
+function filterLog(filter) {
+  activeFilter = filter;
+  currentPage = 1;
+  document.querySelectorAll('.filter-bar .chip').forEach(c => {
+    c.classList.toggle('active', c.dataset.filter === filter);
+  });
+  filteredGames = filter === 'all' ? allGames.slice() : allGames.filter(g => g.opponent === filter);
+  filteredGames.reverse();
+  renderPage();
+}
+
+function renderPage() {
+  const totalPages = Math.max(1, Math.ceil(filteredGames.length / PAGE_SIZE));
+  if (currentPage > totalPages) currentPage = totalPages;
+  const start = (currentPage - 1) * PAGE_SIZE;
+  const page = filteredGames.slice(start, start + PAGE_SIZE);
+
+  const tbody = document.getElementById('logBody');
+  tbody.innerHTML = page.map(g => {
+    const isCorrect = g.actual && g.predicted === g.actual;
+    const isWrong = g.actual && g.predicted !== g.actual;
+    const resultClass = isCorrect ? 'correct' : isWrong ? 'wrong' : 'pending';
+    const resultText = isCorrect ? 'Correct' : isWrong ? 'Wrong' : '—';
+
+    const predTag = g.predicted === 'W' ? 'tag-w' : g.predicted === 'L' ? 'tag-l' : 'tag-na';
+    const actTag = g.actual === 'W' ? 'tag-w' : g.actual === 'L' ? 'tag-l' : 'tag-na';
+
+    const date = isMobile() ? g.date.slice(5) : g.date;
+    const opp = teamName(g.opponent);
+    const ha = isMobile() ? (g.isHome ? 'H' : 'A') : (g.isHome ? 'Home' : 'Away');
+
+    return `<tr>
+      <td>${date}</td>
+      <td>${opp}</td>
+      <td>${ha}</td>
+      <td><span class="tag ${predTag}">${g.predicted}</span></td>
+      <td><span class="tag ${actTag}">${g.actual || '—'}</span></td>
+      <td>${(g.winProbability * 100).toFixed(0)}%</td>
+      <td class="${resultClass}">${resultText}</td>
+    </tr>`;
+  }).join('');
+
+  const pag = document.getElementById('pagination');
+  if (totalPages <= 1) { pag.innerHTML = ''; return; }
+
+  let html = `<button onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>&lsaquo;</button>`;
+  for (let p = 1; p <= totalPages; p++) {
+    html += `<button class="${p === currentPage ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`;
+  }
+  html += `<button onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>&rsaquo;</button>`;
+  html += `<span class="page-info">${filteredGames.length} games</span>`;
+  pag.innerHTML = html;
+}
+
+function goPage(p) {
+  const totalPages = Math.ceil(filteredGames.length / PAGE_SIZE);
+  if (p < 1 || p > totalPages) return;
+  currentPage = p;
+  renderPage();
+}
+
+init();
+window.addEventListener('resize', () => { if (filteredGames.length) renderPage(); });
+</script>
+</body>
+</html>
