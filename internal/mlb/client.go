@@ -81,7 +81,22 @@ func (c *Client) GetGamesSince(date string) ([]GameResult, error) {
 	if err := c.getJSON(url, &resp); err != nil {
 		return nil, fmt.Errorf("fetching games: %w", err)
 	}
+	return c.parseGameResults(resp), nil
+}
 
+// GetSeasonResults returns every completed regular-season Rockies game for the current season.
+func (c *Client) GetSeasonResults() ([]GameResult, error) {
+	season := c.now().Year()
+	url := fmt.Sprintf("%s/schedule?sportId=1&teamId=%d&season=%d&gameType=R&hydrate=linescore",
+		baseURL, c.teamID, season)
+	var resp scheduleResponse
+	if err := c.getJSON(url, &resp); err != nil {
+		return nil, fmt.Errorf("fetching season schedule: %w", err)
+	}
+	return c.parseGameResults(resp), nil
+}
+
+func (c *Client) parseGameResults(resp scheduleResponse) []GameResult {
 	var results []GameResult
 	for _, d := range resp.Dates {
 		for _, g := range d.Games {
@@ -121,8 +136,7 @@ func (c *Client) GetGamesSince(date string) ([]GameResult, error) {
 			results = append(results, gr)
 		}
 	}
-
-	return results, nil
+	return results
 }
 
 // URL-parameterized methods — used by both production code and tests.

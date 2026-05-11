@@ -652,6 +652,8 @@ func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) bool {
 				s.logger.Printf("warning: could not post follow-up: %v", err)
 			} else {
 				p.Actual = actual
+				p.RockiesScore = gr.RockiesScore
+				p.OppScore = gr.OppScore
 				found = true
 			}
 			break

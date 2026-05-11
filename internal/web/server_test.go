@@ -135,7 +135,7 @@ func TestHandler_Routes(t *testing.T) {
 	}{
 		{"/", 200},
 		{"/api/predictions", 200},
-		{"/favicon.ico", 404},
+		{"/favicon.ico", 200},
 		{"/api/other", 404},
 	}
 

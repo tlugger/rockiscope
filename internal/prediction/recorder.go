@@ -55,6 +55,9 @@ type PredictionRecord struct {
 	Predicted     string        `json:"predicted"` // "W" or "L"
 	Confidence   float64       `json:"confidence"` // 0-100
 	Actual       string        `json:"actual,omitempty"` // "W" or "L" or ""
+	RockiesScore int          `json:"rockiesScore,omitempty"`
+	OppScore     int          `json:"oppScore,omitempty"`
+	Synthetic    bool         `json:"synthetic,omitempty"` // backfilled pre-bot record; excluded from prediction-accuracy stats
 	PostURI       string        `json:"postUri,omitempty"`
 	GamePK       int          `json:"gamePk,omitempty"`
 	Factors      FactorScores  `json:"factors"`
@@ -170,7 +173,7 @@ func CalculateFactorAccuracy(predictions []PredictionRecord) (accuracy map[strin
 	correct := make(map[string]int)
 
 	for _, p := range predictions {
-		if p.Actual == "" {
+		if p.Actual == "" || p.Synthetic {
 			continue
 		}
 		won := p.Actual == "W"

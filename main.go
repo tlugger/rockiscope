@@ -4,12 +4,14 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"sort"
 
 	"net/http"
 
 	"github.com/tlugger/rockiscope/internal/bluesky"
 	"github.com/tlugger/rockiscope/internal/horoscope"
 	"github.com/tlugger/rockiscope/internal/mlb"
+	"github.com/tlugger/rockiscope/internal/prediction"
 	"github.com/tlugger/rockiscope/internal/scheduler"
 	"github.com/tlugger/rockiscope/internal/web"
 )
@@ -26,6 +28,7 @@ Commands:
   serve        Start the analytics dashboard web server
   post         Force a post right now, skipping the schedule
   preview      Fetch all data and print the post without posting
+  backfill     One-time: backfill missing season games and score data into prediction_history.json
   test-auth    Test Bluesky authentication
   test-mlb     Test MLB API connectivity and show today's game
   test-horo    Test horoscope scraper and show today's reading
@@ -54,6 +57,8 @@ func main() {
 		cmdPost(logger)
 	case "preview":
 		cmdPreview(logger)
+	case "backfill":
+		cmdBackfill(logger)
 	case "test-auth":
 		cmdTestAuth(logger)
 	case "test-mlb":
@@ -128,6 +133,84 @@ func cmdPreview(logger *log.Logger) {
 	if err := sched.RunOnce(); err != nil {
 		logger.Fatalf("preview failed: %v", err)
 	}
+}
+
+func cmdBackfill(logger *log.Logger) {
+	dataDir := getDataDir()
+	hist, err := prediction.LoadHistory(dataDir)
+	if err != nil {
+		logger.Fatalf("loading history: %v", err)
+	}
+
+	client := mlb.NewClient(nil)
+	logger.Println("fetching completed season games from MLB...")
+	results, err := client.GetSeasonResults()
+	if err != nil {
+		logger.Fatalf("fetching season results: %v", err)
+	}
+	logger.Printf("found %d completed regular-season games", len(results))
+
+	byGamePk := make(map[int]*prediction.PredictionRecord)
+	byDateOpp := make(map[string]*prediction.PredictionRecord)
+	for i := range hist.Predictions {
+		p := &hist.Predictions[i]
+		if p.GamePK != 0 {
+			byGamePk[p.GamePK] = p
+		}
+		byDateOpp[p.Date+"|"+p.Opponent] = p
+	}
+
+	var created, scoresFilled, actualsFilled int
+	for _, gr := range results {
+		existing := byGamePk[gr.GamePk]
+		if existing == nil {
+			existing = byDateOpp[gr.Date+"|"+gr.Opponent]
+		}
+		actual := "L"
+		if gr.Won {
+			actual = "W"
+		}
+
+		if existing != nil {
+			if existing.RockiesScore == 0 && existing.OppScore == 0 && (gr.RockiesScore != 0 || gr.OppScore != 0) {
+				existing.RockiesScore = gr.RockiesScore
+				existing.OppScore = gr.OppScore
+				scoresFilled++
+			}
+			if existing.Actual == "" {
+				existing.Actual = actual
+				actualsFilled++
+			}
+			if existing.GamePK == 0 && gr.GamePk != 0 {
+				existing.GamePK = gr.GamePk
+			}
+			continue
+		}
+
+		hist.Predictions = append(hist.Predictions, prediction.PredictionRecord{
+			Date:           gr.Date,
+			Opponent:       gr.Opponent,
+			IsHome:         gr.IsHome,
+			Predicted:      "L",
+			Confidence:     50,
+			Actual:         actual,
+			RockiesScore:   gr.RockiesScore,
+			OppScore:       gr.OppScore,
+			GamePK:         gr.GamePk,
+			WinProbability: 0.5,
+			Synthetic:      true,
+		})
+		created++
+	}
+
+	sort.SliceStable(hist.Predictions, func(i, j int) bool {
+		return hist.Predictions[i].Date < hist.Predictions[j].Date
+	})
+
+	if err := prediction.SaveHistory(hist, dataDir); err != nil {
+		logger.Fatalf("saving history: %v", err)
+	}
+	logger.Printf("backfill complete: %d synthetic created, %d scores filled, %d actuals filled", created, scoresFilled, actualsFilled)
 }
 
 func cmdTestAuth(logger *log.Logger) {

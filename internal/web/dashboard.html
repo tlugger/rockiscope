@@ -4,6 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Rockiscope Analytics</title>
+<link rel="icon" href="/favicon.ico" sizes="any">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
   :root {
@@ -31,6 +32,16 @@
     text-align: center;
     padding: 32px 0 24px;
   }
+  header .title-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+  }
+  header .logo {
+    height: 56px;
+    width: auto;
+  }
   header h1 {
     font-size: 28px;
     font-weight: 700;
@@ -38,6 +49,19 @@
     letter-spacing: 0.5px;
   }
   header p { color: var(--text-dim); font-size: 14px; margin-top: 6px; }
+  header .links {
+    display: flex;
+    justify-content: center;
+    gap: 14px;
+    margin-top: 12px;
+  }
+  header .links a {
+    display: inline-flex;
+    opacity: 0.6;
+    transition: opacity 0.15s, transform 0.15s;
+  }
+  header .links a:hover { opacity: 1; transform: translateY(-1px); }
+  header .links img { width: 22px; height: 22px; display: block; }
 
   .stats-row {
     display: grid;
@@ -179,6 +203,8 @@
   @media (max-width: 768px) {
     body { padding: 10px; }
     header { padding: 20px 0 16px; }
+    header .title-row { gap: 10px; }
+    header .logo { height: 38px; }
     header h1 { font-size: 22px; }
     header p { font-size: 12px; }
     .stats-row { grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 14px; }
@@ -201,8 +227,19 @@
 </head>
 <body>
 <header>
-  <h1>Rockiscope Analytics</h1>
+  <div class="title-row">
+    <img class="logo" src="https://rockiscope.s3.us-east-1.amazonaws.com/rockiscope.png" alt="Rockiscope">
+    <h1>Rockiscope Analytics</h1>
+  </div>
   <p>Colorado Rockies prediction performance &mdash; powered by the cosmos</p>
+  <div class="links">
+    <a href="https://github.com/tlugger/rockiscope" target="_blank" rel="noopener" title="View source on GitHub" aria-label="GitHub repository">
+      <img src="https://cdn.simpleicons.org/github/C8AAFF" alt="GitHub">
+    </a>
+    <a href="https://bsky.app/profile/rockiscope.bsky.social" target="_blank" rel="noopener" title="Follow on Bluesky" aria-label="Bluesky profile">
+      <img src="https://cdn.simpleicons.org/bluesky/C8AAFF" alt="Bluesky">
+    </a>
+  </div>
 </header>
 
 <div class="stats-row" id="statsRow"></div>
@@ -213,8 +250,8 @@
     <div class="chart-wrap" style="height:280px"><canvas id="accuracyChart"></canvas></div>
   </div>
   <div class="panel">
-    <h2>Confidence Calibration</h2>
-    <div class="chart-wrap" style="height:260px"><canvas id="calibrationChart"></canvas></div>
+    <h2 id="horoscopeTitle">Horoscope vs Run Margin</h2>
+    <div class="chart-wrap" style="height:260px"><canvas id="horoscopeChart"></canvas></div>
   </div>
   <div class="panel">
     <h2>Factor Accuracy vs Actual Outcomes</h2>
@@ -317,33 +354,42 @@ async function init() {
 
   const games = (data.predictions || []).filter(p => p.predicted !== 'N/A');
   const completed = games.filter(g => g.actual);
+  const realCompleted = completed.filter(g => !g.synthetic);
   allGames = games;
 
-  renderStats(completed, data.currentWeights);
-  renderAccuracyChart(completed);
-  renderCalibrationChart(completed);
-  renderFactorChart(completed);
+  renderStats(completed, realCompleted, data.currentWeights);
+  renderAccuracyChart(realCompleted);
+  renderHoroscopeChart(realCompleted);
+  renderFactorChart(realCompleted);
   renderWeightsChart(data.currentWeights);
-  renderOpponentChart(completed);
+  renderOpponentChart(realCompleted);
   renderGameLog(games);
 }
 
-function renderStats(completed, weights) {
-  const correct = completed.filter(g => g.predicted === g.actual).length;
-  const total = completed.length;
-  const pct = total ? ((correct / total) * 100).toFixed(1) : '—';
+function renderStats(completed, realCompleted, weights) {
+  const correct = realCompleted.filter(g => g.predicted === g.actual).length;
+  const total = realCompleted.length;
   const wins = completed.filter(g => g.actual === 'W').length;
   const losses = completed.filter(g => g.actual === 'L').length;
 
-  const recent = completed.slice(-10);
-  const recentCorrect = recent.filter(g => g.predicted === g.actual).length;
-  const recentPct = recent.length ? ((recentCorrect / recent.length) * 100).toFixed(0) : '—';
+  const baseballPct = (num, denom, label) => {
+    if (!denom) return { value: '—', label };
+    const p = num / denom;
+    const value = p.toFixed(3).replace(/^0/, '');
+    const diff = p - 0.5;
+    const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';
+    const diffStr = Math.abs(diff).toFixed(3).replace(/^0/, '');
+    return { value, label: `${label} (${sign}${diffStr} vs .500)` };
+  };
+
+  const acc = baseballPct(correct, total, 'Accuracy');
+  const win = baseballPct(wins, wins + losses, 'Win %');
 
   document.getElementById('statsRow').innerHTML = `
     <div class="stat-card"><div class="value">${correct}-${total - correct}</div><div class="label">Prediction Record</div></div>
-    <div class="stat-card"><div class="value">${pct}%</div><div class="label">Overall Accuracy</div></div>
+    <div class="stat-card"><div class="value">${acc.value}</div><div class="label">${acc.label}</div></div>
     <div class="stat-card"><div class="value">${wins}-${losses}</div><div class="label">Rockies Record</div></div>
-    <div class="stat-card"><div class="value">${recentPct}%</div><div class="label">Last 10 Accuracy</div></div>
+    <div class="stat-card"><div class="value">${win.value}</div><div class="label">${win.label}</div></div>
   `;
 }
 
@@ -429,59 +475,111 @@ function renderAccuracyChart(completed) {
   });
 }
 
-function renderCalibrationChart(completed) {
-  const buckets = {};
-  [[0, 35, '<35%'], [35, 45, '35-45%'], [45, 55, '45-55%'], [55, 65, '55-65%'], [65, 100, '>65%']].forEach(([lo, hi, label]) => {
-    buckets[label] = { correct: 0, total: 0, lo, hi };
+function renderHoroscopeChart(completed) {
+  const scored = completed.filter(g =>
+    g.factors && typeof g.factors.stars === 'number' && g.factors.stars !== 0
+    && typeof g.rockiesScore === 'number' && typeof g.oppScore === 'number'
+    && (g.rockiesScore > 0 || g.oppScore > 0));
+
+  const wins = [];
+  const losses = [];
+  const xs = [], ys = [];
+  scored.forEach(g => {
+    const x = g.factors.stars * 100;
+    const y = g.rockiesScore - g.oppScore;
+    const point = { x, y, g };
+    xs.push(x); ys.push(y);
+    if (g.actual === 'W') wins.push(point);
+    else losses.push(point);
   });
 
-  completed.forEach(g => {
-    const conf = g.winProbability * 100;
-    const predConf = g.predicted === 'W' ? conf : 100 - conf;
-    for (const [label, b] of Object.entries(buckets)) {
-      if (predConf >= b.lo && predConf < b.hi) {
-        b.total++;
-        if (g.predicted === g.actual) b.correct++;
-        break;
-      }
+  const pearson = (xs, ys) => {
+    const n = xs.length;
+    if (n < 2) return null;
+    const mx = xs.reduce((a, b) => a + b, 0) / n;
+    const my = ys.reduce((a, b) => a + b, 0) / n;
+    let num = 0, dx2 = 0, dy2 = 0;
+    for (let i = 0; i < n; i++) {
+      const dx = xs[i] - mx, dy = ys[i] - my;
+      num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
     }
-  });
+    if (dx2 === 0 || dy2 === 0) return null;
+    return num / Math.sqrt(dx2 * dy2);
+  };
 
-  const labels = Object.keys(buckets);
-  const accuracy = labels.map(l => buckets[l].total ? ((buckets[l].correct / buckets[l].total) * 100).toFixed(1) : 0);
-  const counts = labels.map(l => buckets[l].total);
+  const r = pearson(xs, ys);
+  const title = document.getElementById('horoscopeTitle');
+  if (r === null) {
+    title.textContent = `Horoscope vs Run Margin · cosmic r=—`;
+  } else {
+    title.textContent = `Horoscope vs Run Margin · cosmic r=${r.toFixed(2)}`;
+  }
 
-  new Chart(document.getElementById('calibrationChart'), {
-    type: 'bar',
+  const noData = scored.length === 0;
+
+  new Chart(document.getElementById('horoscopeChart'), {
+    type: 'scatter',
     data: {
-      labels,
       datasets: [
         {
-          label: 'Accuracy %',
-          data: accuracy,
-          backgroundColor: labels.map((_, i) => COLORS.factors[i % COLORS.factors.length] + '66'),
-          borderColor: labels.map((_, i) => COLORS.factors[i % COLORS.factors.length]),
-          borderWidth: 1,
-          yAxisID: 'y',
+          label: 'Win',
+          data: wins,
+          backgroundColor: COLORS.green + 'aa',
+          borderColor: COLORS.green,
+          pointRadius: 5,
+          pointHoverRadius: 7,
         },
         {
-          label: 'Game Count',
-          data: counts,
-          type: 'line',
-          borderColor: COLORS.textDim,
-          pointBackgroundColor: COLORS.text,
-          pointRadius: 4,
-          fill: false,
-          yAxisID: 'y1',
+          label: 'Loss',
+          data: losses,
+          backgroundColor: COLORS.red + 'aa',
+          borderColor: COLORS.red,
+          pointStyle: 'crossRot',
+          pointRadius: 6,
+          pointHoverRadius: 8,
         }
       ]
     },
     options: {
       ...CHART_DEFAULTS,
+      plugins: {
+        ...CHART_DEFAULTS.plugins,
+        legend: { labels: { color: COLORS.textDim, font: { size: 11 } } },
+        tooltip: {
+          ...CHART_DEFAULTS.plugins.tooltip,
+          callbacks: {
+            label: (item) => {
+              const g = item.raw.g;
+              const margin = g.rockiesScore - g.oppScore;
+              const sign = margin > 0 ? '+' : '';
+              return `${g.date} vs ${g.opponent}: stars ${item.raw.x.toFixed(0)}%, ${g.rockiesScore}-${g.oppScore} (${sign}${margin})`;
+            }
+          }
+        },
+        subtitle: noData ? {
+          display: true,
+          text: 'No completed games with horoscope + score data yet',
+          color: COLORS.textDim,
+          font: { size: 12, style: 'italic' },
+          padding: { top: 20 }
+        } : { display: false }
+      },
       scales: {
-        x: CHART_DEFAULTS.scales.x,
-        y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } },
-        y1: { position: 'right', grid: { display: false }, ticks: { color: COLORS.textDim, font: { size: 10 } } }
+        x: {
+          ...CHART_DEFAULTS.scales.x,
+          min: 0, max: 100,
+          title: { display: true, text: 'Stars favor Rockies →', color: COLORS.textDim, font: { size: 11 } },
+          ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' }
+        },
+        y: {
+          ...CHART_DEFAULTS.scales.y,
+          title: { display: true, text: 'Run margin (Rockies − Opp)', color: COLORS.textDim, font: { size: 11 } },
+          grid: {
+            ...CHART_DEFAULTS.scales.y.grid,
+            color: ctx => ctx.tick.value === 0 ? 'rgba(200,170,255,0.35)' : COLORS.grid,
+            lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1,
+          }
+        }
       }
     }
   });
@@ -534,7 +632,12 @@ function renderFactorChart(completed) {
         }
       },
       scales: {
-        x: { ...CHART_DEFAULTS.scales.x, min: 0, max: 100, ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' } },
+        x: {
+          ...CHART_DEFAULTS.scales.x,
+          min: 0, max: 100,
+          title: { display: true, text: '% of games where factor lean matched outcome', color: COLORS.textDim, font: { size: 11 } },
+          ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' }
+        },
         y: { ...CHART_DEFAULTS.scales.y, grid: { display: false } }
       }
     }
@@ -669,13 +772,15 @@ function renderPage() {
 
   const tbody = document.getElementById('logBody');
   tbody.innerHTML = page.map(g => {
-    const isCorrect = g.actual && g.predicted === g.actual;
-    const isWrong = g.actual && g.predicted !== g.actual;
-    const resultClass = isCorrect ? 'correct' : isWrong ? 'wrong' : 'pending';
-    const resultText = isCorrect ? 'Correct' : isWrong ? 'Wrong' : '—';
+    const isCorrect = !g.synthetic && g.actual && g.predicted === g.actual;
+    const isWrong = !g.synthetic && g.actual && g.predicted !== g.actual;
+    const resultClass = g.synthetic ? 'pending' : isCorrect ? 'correct' : isWrong ? 'wrong' : 'pending';
+    const resultText = g.synthetic ? 'backfill' : isCorrect ? 'Correct' : isWrong ? 'Wrong' : '—';
 
-    const predTag = g.predicted === 'W' ? 'tag-w' : g.predicted === 'L' ? 'tag-l' : 'tag-na';
+    const predTag = g.synthetic ? 'tag-na' : g.predicted === 'W' ? 'tag-w' : g.predicted === 'L' ? 'tag-l' : 'tag-na';
+    const predText = g.synthetic ? '—' : g.predicted;
     const actTag = g.actual === 'W' ? 'tag-w' : g.actual === 'L' ? 'tag-l' : 'tag-na';
+    const winProb = g.synthetic ? '—' : `${(g.winProbability * 100).toFixed(0)}%`;
 
     const date = isMobile() ? g.date.slice(5) : g.date;
     const opp = teamName(g.opponent);
@@ -685,9 +790,9 @@ function renderPage() {
       <td>${date}</td>
       <td>${opp}</td>
       <td>${ha}</td>
-      <td><span class="tag ${predTag}">${g.predicted}</span></td>
+      <td><span class="tag ${predTag}">${predText}</span></td>
       <td><span class="tag ${actTag}">${g.actual || '—'}</span></td>
-      <td>${(g.winProbability * 100).toFixed(0)}%</td>
+      <td>${winProb}</td>
       <td class="${resultClass}">${resultText}</td>
     </tr>`;
   }).join('');
