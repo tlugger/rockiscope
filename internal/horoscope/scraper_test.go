@@ -1,11 +1,13 @@
 package horoscope
 
 import (
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"strings"
 	"testing"
+	"time"
 )
 
 func TestParseHoroscopeHTML(t *testing.T) {
@@ -65,6 +67,8 @@ func TestScraper_GetDailyHoroscope(t *testing.T) {
 		httpClient: ts.Client(),
 		sign:       "cancer",
 		signID:     4,
+		logger:     log.New(os.Stderr, "[test] ", 0),
+		sleep:      func(time.Duration) {},
 	}
 
 	h, err := s.GetDailyHoroscope()

@@ -142,7 +142,7 @@ func cmdBackfill(logger *log.Logger) {
 		logger.Fatalf("loading history: %v", err)
 	}
 
-	client := mlb.NewClient(nil)
+	client := mlb.NewClient(nil, logger)
 	logger.Println("fetching completed season games from MLB...")
 	results, err := client.GetSeasonResults()
 	if err != nil {
@@ -217,7 +217,7 @@ func cmdTestAuth(logger *log.Logger) {
 	username, password := requireCreds(logger)
 	logger.Printf("authenticating as %s...", username)
 
-	client := bluesky.NewClient(username, password)
+	client := bluesky.NewClient(username, password, logger)
 	if err := client.Authenticate(); err != nil {
 		logger.Fatalf("authentication failed: %v", err)
 	}
@@ -225,7 +225,7 @@ func cmdTestAuth(logger *log.Logger) {
 }
 
 func cmdTestMLB(logger *log.Logger) {
-	client := mlb.NewClient(nil)
+	client := mlb.NewClient(nil, logger)
 
 	logger.Println("fetching today's Rockies game...")
 	game, err := client.GetTodayGame()
@@ -264,7 +264,7 @@ func cmdTestMLB(logger *log.Logger) {
 }
 
 func cmdTestHoro(logger *log.Logger) {
-	scraper := horoscope.NewScraper(nil)
+	scraper := horoscope.NewScraper(nil, logger)
 
 	logger.Println("fetching Cancer horoscope...")
 	horo, err := scraper.GetDailyHoroscope()
@@ -280,8 +280,8 @@ func cmdTestHoro(logger *log.Logger) {
 func newScheduler(logger *log.Logger, poster bluesky.Poster) *scheduler.Scheduler {
 	dataDir := getDataDir()
 	return scheduler.New(scheduler.Config{
-		MLB:       mlb.NewClient(nil),
-		Horoscope: horoscope.NewScraper(nil),
+		MLB:       mlb.NewClient(nil, logger),
+		Horoscope: horoscope.NewScraper(nil, logger),
 		Poster:    poster,
 		Logger:    logger,
 		DataDir:   dataDir,
@@ -301,7 +301,7 @@ func getDataDir() string {
 
 func mustAuthBluesky(logger *log.Logger) bluesky.Poster {
 	username, password := requireCreds(logger)
-	client := bluesky.NewClient(username, password)
+	client := bluesky.NewClient(username, password, logger)
 	if err := client.Authenticate(); err != nil {
 		logger.Fatalf("bluesky auth failed: %v", err)
 	}

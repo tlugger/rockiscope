@@ -5,9 +5,12 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/tlugger/rockiscope/internal/retry"
 )
 
 // PostRef identifies a published post for threading.
@@ -100,14 +103,21 @@ type Client struct {
 	password   string
 	accessJwt  string
 	did        string
+	logger     *log.Logger
+	sleep      func(time.Duration)
 }
 
-func NewClient(username, password string) *Client {
+func NewClient(username, password string, logger *log.Logger) *Client {
+	if logger == nil {
+		logger = log.Default()
+	}
 	return &Client{
 		baseURL:    "https://bsky.social",
 		httpClient: &http.Client{Timeout: 30 * time.Second},
 		username:   username,
 		password:   password,
+		logger:     logger,
+		sleep:      time.Sleep,
 	}
 }
 
@@ -148,29 +158,40 @@ func (c *Client) authenticateWithURL(url string) error {
 	return nil
 }
 
-func (c *Client) Post(text string, image *ImageData) (*PostRef, error) {
-	if err := c.Authenticate(); err != nil {
-		return nil, err
+func (c *Client) sleepFn() func(time.Duration) {
+	if c.sleep != nil {
+		return c.sleep
 	}
-	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, nil, nil, nil, nil)
+	return time.Sleep
+}
+
+func (c *Client) Post(text string, image *ImageData) (*PostRef, error) {
+	return retry.DoWith(c.logger, "Bluesky post", c.sleepFn(), func() (*PostRef, error) {
+		if err := c.Authenticate(); err != nil {
+			return nil, err
+		}
+		return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, nil, nil, nil, nil)
+	})
 }
 
 func (c *Client) Reply(text string, image *ImageData, parentURI, rootURI string) (*PostRef, error) {
-	if err := c.Authenticate(); err != nil {
-		return nil, err
-	}
-	parentCID, err := c.GetRecordCID(parentURI)
-	if err != nil {
-		return nil, fmt.Errorf("fetching parent CID: %w", err)
-	}
-	rootCID := parentCID
-	if rootURI != "" && rootURI != parentURI {
-		rootCID, err = c.GetRecordCID(rootURI)
-		if err != nil {
-			return nil, fmt.Errorf("fetching root CID: %w", err)
+	return retry.DoWith(c.logger, "Bluesky reply", c.sleepFn(), func() (*PostRef, error) {
+		if err := c.Authenticate(); err != nil {
+			return nil, err
 		}
-	}
-	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, &parentURI, &rootURI, &parentCID, &rootCID)
+		parentCID, err := c.GetRecordCID(parentURI)
+		if err != nil {
+			return nil, fmt.Errorf("fetching parent CID: %w", err)
+		}
+		rootCID := parentCID
+		if rootURI != "" && rootURI != parentURI {
+			rootCID, err = c.GetRecordCID(rootURI)
+			if err != nil {
+				return nil, fmt.Errorf("fetching root CID: %w", err)
+			}
+		}
+		return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, &parentURI, &rootURI, &parentCID, &rootCID)
+	})
 }
 
 func (c *Client) createRecord(url, text string, image *ImageData, parentURI, rootURI, parentCID, rootCID *string) (*PostRef, error) {

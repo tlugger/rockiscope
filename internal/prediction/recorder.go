@@ -76,6 +76,16 @@ func (h *PredictionHistory) Add(pred PredictionRecord) {
 	}
 }
 
+func (h *PredictionHistory) UpdatePostURI(gamePk int, date, uri string) {
+	for i := len(h.Predictions) - 1; i >= 0; i-- {
+		p := &h.Predictions[i]
+		if (gamePk != 0 && p.GamePK == gamePk) || (gamePk == 0 && p.Date == date) {
+			p.PostURI = uri
+			return
+		}
+	}
+}
+
 func (h *PredictionHistory) Recent(n int) []PredictionRecord {
 	if n > len(h.Predictions) {
 		n = len(h.Predictions)

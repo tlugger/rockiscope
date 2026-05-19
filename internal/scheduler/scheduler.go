@@ -345,12 +345,15 @@ func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
 
 	post := s.buildGameDayPost(game)
 	img := s.generateImage(post.HoroscopeText)
+
+	s.recordPrediction(today, game, post.Prediction, "")
+
 	postRef, err := s.poster.Post(post.Text, img)
 	if err != nil {
-		return err
+		s.logger.Printf("warning: prediction saved but Bluesky post failed: %v", err)
+	} else {
+		s.updatePostURI(game.GamePk, today, postRef.URI)
 	}
-
-	s.recordPrediction(today, game, post.Prediction, postRef.URI)
 
 	s.lastPostDate = today
 	if err := saveLastPostDate(s); err != nil {
@@ -374,12 +377,15 @@ func (s *Scheduler) handleOffDay(today string) error {
 
 	post := s.buildOffDayPost()
 	img := s.generateImage(post.HoroscopeText)
+
+	s.recordOffDay(today, post.Prediction, "")
+
 	postRef, err := s.poster.Post(post.Text, img)
 	if err != nil {
-		return err
+		s.logger.Printf("warning: prediction saved but Bluesky post failed: %v", err)
+	} else {
+		s.updatePostURI(0, today, postRef.URI)
 	}
-
-	s.recordOffDay(today, post.Prediction, postRef.URI)
 
 	s.lastPostDate = today
 	if err := saveLastPostDate(s); err != nil {
@@ -567,6 +573,16 @@ func (s *Scheduler) recordOffDay(date string, pred prediction.Prediction, postUR
 	s.predHistory.Add(rec)
 	if err := s.savePredictionHistory(); err != nil {
 		s.logger.Printf("warning: could not save prediction: %v", err)
+	}
+}
+
+func (s *Scheduler) updatePostURI(gamePk int, date, uri string) {
+	if s.predHistory == nil {
+		return
+	}
+	s.predHistory.UpdatePostURI(gamePk, date, uri)
+	if err := s.savePredictionHistory(); err != nil {
+		s.logger.Printf("warning: could not save post URI update: %v", err)
 	}
 }
 

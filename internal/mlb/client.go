@@ -3,10 +3,13 @@ package mlb
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/tlugger/rockiscope/internal/retry"
 )
 
 const (
@@ -20,16 +23,23 @@ type Client struct {
 	httpClient *http.Client
 	teamID     int
 	now        func() time.Time
+	logger     *log.Logger
+	sleep      func(time.Duration)
 }
 
-func NewClient(httpClient *http.Client) *Client {
+func NewClient(httpClient *http.Client, logger *log.Logger) *Client {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 15 * time.Second}
+	}
+	if logger == nil {
+		logger = log.Default()
 	}
 	return &Client{
 		httpClient: httpClient,
 		teamID:     RockiesID,
 		now:        time.Now,
+		logger:     logger,
+		sleep:      time.Sleep,
 	}
 }
 
@@ -345,15 +355,17 @@ func (c *Client) parseH2H(resp scheduleResponse, opponentID int) *H2HRecord {
 }
 
 func (c *Client) getJSON(url string, v interface{}) error {
-	resp, err := c.httpClient.Get(url)
-	if err != nil {
-		return err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API returned status %d for %s", resp.StatusCode, url)
-	}
-	return json.NewDecoder(resp.Body).Decode(v)
+	return retry.RunWith(c.logger, "MLB API", c.sleep, func() error {
+		resp, err := c.httpClient.Get(url)
+		if err != nil {
+			return err
+		}
+		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return fmt.Errorf("API returned status %d for %s", resp.StatusCode, url)
+		}
+		return json.NewDecoder(resp.Body).Decode(v)
+	})
 }
 
 func denverLoc() *time.Location {

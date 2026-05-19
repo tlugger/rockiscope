@@ -1,12 +1,15 @@
 package mlb
 
 import (
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
 	"time"
 )
+
+func testLogger() *log.Logger { return log.New(os.Stderr, "[test] ", 0) }
 
 func fixtureServer(t *testing.T, fixturePath string) *httptest.Server {
 	t.Helper()
@@ -22,7 +25,7 @@ func fixtureServer(t *testing.T, fixturePath string) *httptest.Server {
 
 func testClient(t *testing.T, serverURL string) *Client {
 	t.Helper()
-	c := NewClient(&http.Client{})
+	c := NewClient(&http.Client{}, testLogger())
 	c.now = func() time.Time {
 		return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC)
 	}
@@ -46,6 +49,8 @@ func TestGetTodayGame(t *testing.T) {
 		httpClient: ts.Client(),
 		teamID:     RockiesID,
 		now:        func() time.Time { return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC) },
+		logger:     testLogger(),
+		sleep:      func(time.Duration) {},
 	}
 
 	// Override getJSON to use test server
@@ -97,6 +102,8 @@ func TestGetTodayGame_OffDay(t *testing.T) {
 		httpClient: ts.Client(),
 		teamID:     RockiesID,
 		now:        func() time.Time { return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC) },
+		logger:     testLogger(),
+		sleep:      func(time.Duration) {},
 	}
 
 	game, err := c.getGameFromURL(ts.URL)
@@ -157,6 +164,8 @@ func TestGetTodayGames_SingleGame(t *testing.T) {
 		httpClient: ts.Client(),
 		teamID:     RockiesID,
 		now:        func() time.Time { return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC) },
+		logger:     testLogger(),
+		sleep:      func(time.Duration) {},
 	}
 
 	games, err := c.getGamesFromURL(ts.URL)
@@ -181,6 +190,8 @@ func TestGetTodayGames_OffDay(t *testing.T) {
 		httpClient: ts.Client(),
 		teamID:     RockiesID,
 		now:        func() time.Time { return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC) },
+		logger:     testLogger(),
+		sleep:      func(time.Duration) {},
 	}
 
 	games, err := c.getGamesFromURL(ts.URL)
@@ -200,6 +211,8 @@ func TestGetTeamRecord(t *testing.T) {
 		httpClient: ts.Client(),
 		teamID:     RockiesID,
 		now:        func() time.Time { return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC) },
+		logger:     testLogger(),
+		sleep:      func(time.Duration) {},
 	}
 
 	rec, err := c.getTeamRecordFromURL(ts.URL)
@@ -232,6 +245,8 @@ func TestGetPitcherStats(t *testing.T) {
 		httpClient: ts.Client(),
 		teamID:     RockiesID,
 		now:        func() time.Time { return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC) },
+		logger:     testLogger(),
+		sleep:      func(time.Duration) {},
 	}
 
 	stats, err := c.getPitcherStatsFromURL(ts.URL)
@@ -264,6 +279,8 @@ func TestGetHeadToHead(t *testing.T) {
 		httpClient: ts.Client(),
 		teamID:     RockiesID,
 		now:        func() time.Time { return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC) },
+		logger:     testLogger(),
+		sleep:      func(time.Duration) {},
 	}
 
 	h2h, err := c.getH2HFromURL(ts.URL, 117) // vs Astros
@@ -290,6 +307,8 @@ func TestGetHeadToHead_NoGames(t *testing.T) {
 		httpClient: ts.Client(),
 		teamID:     RockiesID,
 		now:        func() time.Time { return time.Date(2026, 4, 8, 12, 0, 0, 0, time.UTC) },
+		logger:     testLogger(),
+		sleep:      func(time.Duration) {},
 	}
 
 	h2h, err := c.getH2HFromURL(ts.URL, 999) // team we haven't played

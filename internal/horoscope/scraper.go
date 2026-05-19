@@ -3,10 +3,13 @@ package horoscope
 import (
 	"fmt"
 	"io"
+	"log"
 	"net/http"
 	"regexp"
 	"strings"
 	"time"
+
+	"github.com/tlugger/rockiscope/internal/retry"
 )
 
 // Horoscope represents a daily horoscope reading.
@@ -26,6 +29,8 @@ type Scraper struct {
 	httpClient *http.Client
 	sign       string
 	signID     int
+	logger     *log.Logger
+	sleep      func(time.Duration)
 }
 
 var signIDs = map[string]int{
@@ -34,15 +39,20 @@ var signIDs = map[string]int{
 	"sagittarius": 9, "capricorn": 10, "aquarius": 11, "pisces": 12,
 }
 
-func NewScraper(httpClient *http.Client) *Scraper {
+func NewScraper(httpClient *http.Client, logger *log.Logger) *Scraper {
 	if httpClient == nil {
 		httpClient = &http.Client{Timeout: 15 * time.Second}
+	}
+	if logger == nil {
+		logger = log.Default()
 	}
 	return &Scraper{
 		baseURL:    "https://www.horoscope.com",
 		httpClient: httpClient,
 		sign:       "cancer",
 		signID:     4,
+		logger:     logger,
+		sleep:      time.Sleep,
 	}
 }
 
@@ -52,34 +62,36 @@ func (s *Scraper) GetDailyHoroscope() (*Horoscope, error) {
 }
 
 func (s *Scraper) fetchFromURL(url string) (*Horoscope, error) {
-	req, err := http.NewRequest("GET", url, nil)
-	if err != nil {
-		return nil, err
-	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Rockiscope/2.0)")
-	req.Header.Set("Accept", "text/html")
+	return retry.DoWith(s.logger, "horoscope fetch", s.sleep, func() (*Horoscope, error) {
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return nil, err
+		}
+		req.Header.Set("User-Agent", "Mozilla/5.0 (compatible; Rockiscope/2.0)")
+		req.Header.Set("Accept", "text/html")
 
-	resp, err := s.httpClient.Do(req)
-	if err != nil {
-		return nil, fmt.Errorf("fetching horoscope: %w", err)
-	}
-	defer resp.Body.Close()
+		resp, err := s.httpClient.Do(req)
+		if err != nil {
+			return nil, fmt.Errorf("fetching horoscope: %w", err)
+		}
+		defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return nil, fmt.Errorf("horoscope.com returned status %d", resp.StatusCode)
-	}
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("horoscope.com returned status %d", resp.StatusCode)
+		}
 
-	body, err := io.ReadAll(resp.Body)
-	if err != nil {
-		return nil, fmt.Errorf("reading response: %w", err)
-	}
+		body, err := io.ReadAll(resp.Body)
+		if err != nil {
+			return nil, fmt.Errorf("reading response: %w", err)
+		}
 
-	text, err := ParseHoroscopeHTML(string(body))
-	if err != nil {
-		return nil, err
-	}
+		text, err := ParseHoroscopeHTML(string(body))
+		if err != nil {
+			return nil, err
+		}
 
-	return &Horoscope{Sign: s.sign, Text: text}, nil
+		return &Horoscope{Sign: s.sign, Text: text}, nil
+	})
 }
 
 // ParseHoroscopeHTML extracts the horoscope text from horoscope.com HTML.

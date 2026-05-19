@@ -2,11 +2,16 @@ package bluesky
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"testing"
+	"time"
 )
+
+func testLogger() *log.Logger { return log.New(os.Stderr, "[test] ", 0) }
 
 func mockBlueskyServer(t *testing.T, onPost func(body map[string]interface{})) *httptest.Server {
 	t.Helper()
@@ -68,6 +73,7 @@ func TestAuthenticate(t *testing.T) {
 	c := &Client{
 		baseURL: ts.URL, httpClient: ts.Client(),
 		username: "test.bsky.social", password: "test-password",
+		logger: testLogger(),
 	}
 
 	err := c.authenticateWithURL(ts.URL)
@@ -85,7 +91,7 @@ func TestAuthenticate_BadStatus(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c := &Client{httpClient: ts.Client(), username: "bad", password: "creds"}
+	c := &Client{httpClient: ts.Client(), username: "bad", password: "creds", logger: testLogger()}
 	err := c.authenticateWithURL(ts.URL)
 	if err == nil {
 		t.Error("expected error for 401")
@@ -103,7 +109,7 @@ func TestPost_TextOnly(t *testing.T) {
 	})
 	defer ts.Close()
 
-	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test"}
+	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test", logger: testLogger()}
 	ref, err := c.Post("Hello!", nil)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -130,7 +136,7 @@ func TestPost_WithImage(t *testing.T) {
 	})
 	defer ts.Close()
 
-	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test"}
+	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test", logger: testLogger()}
 	img := &ImageData{Bytes: []byte("fake-png"), Alt: "test image", Width: 800, Height: 420}
 	_, err := c.Post("Post with image", img)
 	if err != nil {
@@ -142,7 +148,7 @@ func TestPost_WithImage(t *testing.T) {
 }
 
 func TestPost_NotAuthenticated(t *testing.T) {
-	c := &Client{baseURL: "http://localhost:1", httpClient: http.DefaultClient, username: "x", password: "x"}
+	c := &Client{baseURL: "http://localhost:1", httpClient: &http.Client{Timeout: 100 * time.Millisecond}, username: "x", password: "x", logger: testLogger(), sleep: func(time.Duration) {}}
 	_, err := c.Post("test", nil)
 	if err == nil {
 		t.Error("expected error when auth server unreachable")
@@ -218,7 +224,7 @@ func TestGetRecordCID(t *testing.T) {
 	}))
 	defer ts.Close()
 
-	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test"}
+	c := &Client{baseURL: ts.URL, httpClient: ts.Client(), username: "test", password: "test", logger: testLogger()}
 	cid, err := c.GetRecordCID("at://did:plc:fake123/app.bsky.feed.post/abc123")
 	if err != nil {
 		t.Fatalf("GetRecordCID error: %v", err)
