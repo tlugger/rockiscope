@@ -643,3 +643,129 @@ func TestTick_DoubleHeader_SkipsAlreadyPosted(t *testing.T) {
 		t.Fatalf("expected 1 post (game 1 already posted), got %d", len(poster.posts))
 	}
 }
+
+func TestRetryPost_PostsUnpostedPrediction(t *testing.T) {
+	denver := mlb.DenverLocation()
+	gameTime := time.Date(2026, 4, 8, 19, 10, 0, 0, time.UTC)
+	nowTime := gameTime.Add(30 * time.Minute)
+	today := nowTime.In(denver).Format("2006-01-02")
+
+	poster := &mockPoster{}
+	hist := &prediction.PredictionHistory{
+		Predictions: []prediction.PredictionRecord{
+			{
+				Date: today, Opponent: "Houston Astros", IsHome: true,
+				Predicted: "W", Confidence: 65, GamePK: 1234, PostURI: "",
+			},
+		},
+		Current: prediction.DefaultWeights(),
+	}
+
+	s := &Scheduler{
+		mlb: &mockMLB{
+			games: []*mlb.Game{
+				{
+					GamePk: 1234, GameDateTime: gameTime, Status: "Preview",
+					Venue: "Coors Field", IsHome: true,
+					HomeTeam: mlb.TeamInfo{ID: 115, Name: "Colorado Rockies", Wins: 5, Losses: 6,
+						ProbablePitcher: &mlb.PitcherInfo{ID: 547179, FullName: "Michael Lorenzen"}},
+					AwayTeam: mlb.TeamInfo{ID: 117, Name: "Houston Astros", Wins: 7, Losses: 4},
+				},
+			},
+			record:  &mlb.TeamRecord{Wins: 5, Losses: 6, WinningPercentage: 0.455},
+			pitcher: &mlb.PitcherStats{FullName: "Michael Lorenzen", ERA: 9.00},
+			h2h:     &mlb.H2HRecord{OpponentName: "Houston Astros", Wins: 2, Losses: 1, GamesPlayed: 3},
+		},
+		horoscope: &mockHoroscope{
+			horo: &horoscope.Horoscope{Sign: "cancer", Text: "The stars favor bold moves today."},
+		},
+		poster:      poster,
+		predHistory: hist,
+		now:         func() time.Time { return nowTime },
+		sleep:       func(d time.Duration) {},
+		logger:      testLogger(),
+	}
+
+	if err := s.RetryPost(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(poster.posts) != 1 {
+		t.Fatalf("expected 1 post, got %d", len(poster.posts))
+	}
+	if !strings.Contains(poster.posts[0], "Rockies") {
+		t.Errorf("post should mention Rockies:\n%s", poster.posts[0])
+	}
+
+	if hist.Predictions[0].PostURI == "" {
+		t.Error("expected PostURI to be updated after retry")
+	}
+}
+
+func TestRetryPost_SkipsAlreadyPosted(t *testing.T) {
+	denver := mlb.DenverLocation()
+	nowTime := time.Date(2026, 4, 8, 20, 0, 0, 0, denver)
+	today := nowTime.In(denver).Format("2006-01-02")
+
+	poster := &mockPoster{}
+	s := &Scheduler{
+		mlb:       &mockMLB{},
+		horoscope: &mockHoroscope{},
+		poster:    poster,
+		predHistory: &prediction.PredictionHistory{
+			Predictions: []prediction.PredictionRecord{
+				{Date: today, Opponent: "Houston Astros", GamePK: 1234, PostURI: "at://already/posted"},
+			},
+			Current: prediction.DefaultWeights(),
+		},
+		now:    func() time.Time { return nowTime },
+		sleep:  func(d time.Duration) {},
+		logger: testLogger(),
+	}
+
+	err := s.RetryPost()
+	if err == nil {
+		t.Fatal("expected error when no unposted predictions")
+	}
+	if !strings.Contains(err.Error(), "no unposted predictions") {
+		t.Errorf("unexpected error: %v", err)
+	}
+	if len(poster.posts) != 0 {
+		t.Errorf("expected 0 posts, got %d", len(poster.posts))
+	}
+}
+
+func TestRetryPost_OffDay(t *testing.T) {
+	denver := mlb.DenverLocation()
+	nowTime := time.Date(2026, 4, 10, 11, 0, 0, 0, denver)
+	today := nowTime.In(denver).Format("2006-01-02")
+
+	poster := &mockPoster{}
+	hist := &prediction.PredictionHistory{
+		Predictions: []prediction.PredictionRecord{
+			{Date: today, Opponent: "Off Day", Predicted: "N/A", PostURI: ""},
+		},
+		Current: prediction.DefaultWeights(),
+	}
+
+	s := &Scheduler{
+		mlb:         &mockMLB{game: nil, record: &mlb.TeamRecord{Wins: 5, Losses: 6, WinningPercentage: 0.455}},
+		horoscope:   &mockHoroscope{horo: &horoscope.Horoscope{Sign: "cancer", Text: "Rest and reflect."}},
+		poster:      poster,
+		predHistory: hist,
+		now:         func() time.Time { return nowTime },
+		sleep:       func(d time.Duration) {},
+		logger:      testLogger(),
+	}
+
+	if err := s.RetryPost(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if len(poster.posts) != 1 {
+		t.Fatalf("expected 1 post, got %d", len(poster.posts))
+	}
+	if hist.Predictions[0].PostURI == "" {
+		t.Error("expected PostURI to be updated after retry")
+	}
+}

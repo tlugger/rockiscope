@@ -27,6 +27,7 @@ Commands:
   run          Start the scheduler daemon (default if no command given)
   serve        Start the analytics dashboard web server
   post         Force a post right now, skipping the schedule
+  retry-post   Retry posting for today's predictions that failed to post to Bluesky
   preview      Fetch all data and print the post without posting
   backfill     One-time: backfill missing season games and score data into prediction_history.json
   test-auth    Test Bluesky authentication
@@ -55,6 +56,8 @@ func main() {
 		cmdServe(logger)
 	case "post":
 		cmdPost(logger)
+	case "retry-post":
+		cmdRetryPost(logger)
 	case "preview":
 		cmdPreview(logger)
 	case "backfill":
@@ -115,6 +118,14 @@ func cmdPost(logger *log.Logger) {
 	sched := newScheduler(logger, poster)
 	if err := sched.RunOnce(); err != nil {
 		logger.Fatalf("post failed: %v", err)
+	}
+}
+
+func cmdRetryPost(logger *log.Logger) {
+	poster := mustAuthBluesky(logger)
+	sched := newScheduler(logger, poster)
+	if err := sched.RetryPost(); err != nil {
+		logger.Fatalf("retry-post failed: %v", err)
 	}
 }
 

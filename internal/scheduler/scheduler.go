@@ -749,3 +749,60 @@ func (s *Scheduler) RunOnce() error {
 
 	return s.publish(post)
 }
+
+func (s *Scheduler) RetryPost() error {
+	denver := mlb.DenverLocation()
+	today := s.now().In(denver).Format("2006-01-02")
+
+	if s.predHistory == nil || len(s.predHistory.Predictions) == 0 {
+		return fmt.Errorf("no prediction history found")
+	}
+
+	var unposted []*prediction.PredictionRecord
+	for i := range s.predHistory.Predictions {
+		p := &s.predHistory.Predictions[i]
+		if p.Date == today && p.PostURI == "" {
+			unposted = append(unposted, p)
+		}
+	}
+
+	if len(unposted) == 0 {
+		return fmt.Errorf("no unposted predictions found for %s", today)
+	}
+
+	games, err := s.mlb.GetTodayGames()
+	if err != nil {
+		return fmt.Errorf("fetching today's games: %w", err)
+	}
+
+	gamesByPk := make(map[int]*mlb.Game)
+	for _, g := range games {
+		gamesByPk[g.GamePk] = g
+	}
+
+	for _, p := range unposted {
+		var post formatter.Post
+
+		if p.Opponent == "Off Day" {
+			s.logger.Println("retrying off-day post...")
+			post = s.buildOffDayPost()
+		} else if game, ok := gamesByPk[p.GamePK]; ok {
+			s.logger.Printf("retrying post for game vs %s...", p.Opponent)
+			post = s.buildGameDayPost(game)
+		} else {
+			s.logger.Printf("warning: could not find game %d for prediction vs %s, skipping", p.GamePK, p.Opponent)
+			continue
+		}
+
+		img := s.generateImage(post.HoroscopeText)
+		postRef, err := s.poster.Post(post.Text, img)
+		if err != nil {
+			return fmt.Errorf("posting to Bluesky: %w", err)
+		}
+
+		s.logger.Printf("posted successfully: %s", postRef.URI)
+		s.updatePostURI(p.GamePK, today, postRef.URI)
+	}
+
+	return nil
+}
