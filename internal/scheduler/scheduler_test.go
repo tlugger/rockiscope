@@ -21,6 +21,7 @@ type mockMLB struct {
 	pitcher  *mlb.PitcherStats
 	h2h      *mlb.H2HRecord
 	gamesSince []mlb.GameResult
+	liveStatus []mlb.GameLiveStatus
 }
 
 func (m *mockMLB) GetTodayGame() (*mlb.Game, error) {
@@ -45,6 +46,7 @@ func (m *mockMLB) GetTeamRecord() (*mlb.TeamRecord, error)        { return m.rec
 func (m *mockMLB) GetPitcherStats(id int) (*mlb.PitcherStats, error) { return m.pitcher, nil }
 func (m *mockMLB) GetHeadToHead(id int) (*mlb.H2HRecord, error)  { return m.h2h, nil }
 func (m *mockMLB) GetGamesSince(date string) ([]mlb.GameResult, error) { return m.gamesSince, nil }
+func (m *mockMLB) GetGameLiveStatus(date string) ([]mlb.GameLiveStatus, error) { return m.liveStatus, nil }
 
 type mockHoroscope struct {
 	horo *horoscope.Horoscope
@@ -767,5 +769,97 @@ func TestRetryPost_OffDay(t *testing.T) {
 	}
 	if hist.Predictions[0].PostURI == "" {
 		t.Error("expected PostURI to be updated after retry")
+	}
+}
+
+func TestCalculateSleepDuration_TieredPolling(t *testing.T) {
+	denver := mlb.DenverLocation()
+
+	tests := []struct {
+		name         string
+		now          time.Time
+		gameTime     time.Time
+		liveStatus   []mlb.GameLiveStatus
+		wantMin      time.Duration
+		wantMax      time.Duration
+	}{
+		{
+			name:     "game hasn't started — sleep until 2h after start",
+			now:      time.Date(2026, 4, 8, 18, 0, 0, 0, denver),
+			gameTime: time.Date(2026, 4, 8, 19, 10, 0, 0, denver),
+			wantMin:  3*time.Hour + 9*time.Minute,
+			wantMax:  3*time.Hour + 11*time.Minute,
+		},
+		{
+			name:     "game started 30min ago — sleep remaining ~1h30m",
+			now:      time.Date(2026, 4, 8, 19, 40, 0, 0, denver),
+			gameTime: time.Date(2026, 4, 8, 19, 10, 0, 0, denver),
+			wantMin:  89 * time.Minute,
+			wantMax:  91 * time.Minute,
+		},
+		{
+			name:     "game 2h+ in — inning 5, poll every 5min",
+			now:      time.Date(2026, 4, 8, 21, 30, 0, 0, denver),
+			gameTime: time.Date(2026, 4, 8, 19, 10, 0, 0, denver),
+			liveStatus: []mlb.GameLiveStatus{
+				{GamePk: 1234, Status: "Live", CurrentInning: 5, InningState: "Top"},
+			},
+			wantMin: 5 * time.Minute,
+			wantMax: 5 * time.Minute,
+		},
+		{
+			name:     "game 2h+ in — inning 9, poll every 2min",
+			now:      time.Date(2026, 4, 8, 22, 0, 0, 0, denver),
+			gameTime: time.Date(2026, 4, 8, 19, 10, 0, 0, denver),
+			liveStatus: []mlb.GameLiveStatus{
+				{GamePk: 1234, Status: "Live", CurrentInning: 9, InningState: "Bottom"},
+			},
+			wantMin: 2 * time.Minute,
+			wantMax: 2 * time.Minute,
+		},
+		{
+			name:     "game 2h+ in — extra innings, poll every 2min",
+			now:      time.Date(2026, 4, 8, 22, 30, 0, 0, denver),
+			gameTime: time.Date(2026, 4, 8, 19, 10, 0, 0, denver),
+			liveStatus: []mlb.GameLiveStatus{
+				{GamePk: 1234, Status: "Live", CurrentInning: 11, InningState: "Top"},
+			},
+			wantMin: 2 * time.Minute,
+			wantMax: 2 * time.Minute,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			s := &Scheduler{
+				mlb: &mockMLB{
+					games: []*mlb.Game{
+						{
+							GamePk: 1234, GameDateTime: tt.gameTime, Status: "Live",
+							IsHome: true,
+							HomeTeam: mlb.TeamInfo{ID: 115, Name: "Colorado Rockies"},
+							AwayTeam: mlb.TeamInfo{ID: 117, Name: "Houston Astros"},
+						},
+					},
+					liveStatus: tt.liveStatus,
+				},
+				now:           func() time.Time { return tt.now },
+				sleep:         func(d time.Duration) {},
+				logger:        testLogger(),
+				lastPostDate:  tt.now.In(denver).Format("2006-01-02"),
+				lastReplyDate: "",
+				predHistory: &prediction.PredictionHistory{
+					Predictions: []prediction.PredictionRecord{
+						{Date: tt.now.In(denver).Format("2006-01-02"), GamePK: 1234, Opponent: "Houston Astros", Predicted: "W"},
+					},
+					Current: prediction.DefaultWeights(),
+				},
+			}
+
+			got := s.calculateSleepDuration()
+			if got < tt.wantMin || got > tt.wantMax {
+				t.Errorf("sleep = %s, want between %s and %s", got, tt.wantMin, tt.wantMax)
+			}
+		})
 	}
 }

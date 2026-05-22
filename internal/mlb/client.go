@@ -84,6 +84,27 @@ type GameResult struct {
 	Status     string `json:"status"`
 }
 
+func (c *Client) GetGameLiveStatus(date string) ([]GameLiveStatus, error) {
+	url := fmt.Sprintf("%s/schedule?sportId=1&teamId=%d&date=%s&hydrate=linescore",
+		baseURL, c.teamID, date)
+	var resp scheduleResponse
+	if err := c.getJSON(url, &resp); err != nil {
+		return nil, fmt.Errorf("fetching live status: %w", err)
+	}
+	var statuses []GameLiveStatus
+	for _, d := range resp.Dates {
+		for _, g := range d.Games {
+			statuses = append(statuses, GameLiveStatus{
+				GamePk:        g.GamePk,
+				Status:        g.Status.AbstractGameState,
+				CurrentInning: g.Linescore.CurrentInning,
+				InningState:   g.Linescore.InningState,
+			})
+		}
+	}
+	return statuses, nil
+}
+
 func (c *Client) GetGamesSince(date string) ([]GameResult, error) {
 	url := fmt.Sprintf("%s/schedule?sportId=1&teamId=%d&startDate=%s&endDate=%s&hydrate=linescore",
 		baseURL, c.teamID, date, date)
@@ -469,6 +490,10 @@ type scheduleGame struct {
 	Venue  struct {
 		Name string `json:"name"`
 	} `json:"venue"`
+	Linescore struct {
+		CurrentInning int    `json:"currentInning"`
+		InningState   string `json:"inningState"`
+	} `json:"linescore"`
 }
 
 type scheduleTeam struct {

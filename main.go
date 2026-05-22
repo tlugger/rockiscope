@@ -95,7 +95,8 @@ func cmdRun(logger *log.Logger) {
 		}
 	}()
 
-	poster := mustAuthBluesky(logger)
+	username, password := requireCreds(logger)
+	poster := bluesky.NewClient(username, password, logger)
 	sched := newScheduler(logger, poster)
 	sched.Run()
 }

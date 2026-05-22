@@ -202,20 +202,7 @@ func (s *Scheduler) calculateSleepDuration() time.Duration {
 	games, err := s.mlb.GetTodayGames()
 	if err == nil && len(games) > 0 {
 		if s.lastPostDate == today && s.lastReplyDate != today {
-			for _, game := range games {
-				if !s.hasPostedGame(game.GamePk) && game.Status != "Final" {
-					gameTime := now
-					if game.GameDateTime.After(now) {
-						gameTime = game.GameDateTime.In(denver)
-					}
-					wakeTime := gameTime.Add(30 * time.Minute)
-					if wakeTime.After(now) {
-						return wakeTime.Sub(now)
-					}
-					return 30 * time.Minute
-				}
-			}
-			return 1 * time.Minute
+			return s.calculateGamePollInterval(games, now)
 		}
 
 		if s.lastPostDate != today {
@@ -244,6 +231,62 @@ func (s *Scheduler) calculateSleepDuration() time.Duration {
 		sleepDur = 1 * time.Minute
 	}
 	return sleepDur
+}
+
+func (s *Scheduler) calculateGamePollInterval(games []*mlb.Game, now time.Time) time.Duration {
+	denver := mlb.DenverLocation()
+	today := now.Format("2006-01-02")
+
+	for _, game := range games {
+		if game.Status == "Final" {
+			continue
+		}
+
+		gameTime := game.GameDateTime.In(denver)
+		if gameTime.After(now) {
+			wakeTime := gameTime.Add(2 * time.Hour)
+			if wakeTime.After(now) {
+				s.logger.Printf("game hasn't started yet, sleeping until ~2h after first pitch")
+				return wakeTime.Sub(now)
+			}
+		}
+
+		timeSinceStart := now.Sub(gameTime)
+		if timeSinceStart < 2*time.Hour {
+			remaining := 2*time.Hour - timeSinceStart
+			s.logger.Printf("game started %s ago, sleeping %s until 2h mark",
+				timeSinceStart.Round(time.Minute), remaining.Round(time.Minute))
+			return remaining
+		}
+
+		statuses, err := s.mlb.GetGameLiveStatus(today)
+		if err != nil {
+			s.logger.Printf("warning: could not get live status, falling back to 5min poll: %v", err)
+			return 5 * time.Minute
+		}
+
+		for _, status := range statuses {
+			if status.GamePk != game.GamePk {
+				continue
+			}
+			if status.Status == "Final" {
+				s.logger.Println("game just finished, checking results")
+				return 1 * time.Minute
+			}
+			if status.CurrentInning >= 9 {
+				s.logger.Printf("inning %d — polling every 2 minutes", status.CurrentInning)
+				return 2 * time.Minute
+			}
+			s.logger.Printf("inning %d — polling every 5 minutes", status.CurrentInning)
+			return 5 * time.Minute
+		}
+
+		s.logger.Println("no live status found for game, polling every 5 minutes")
+		return 5 * time.Minute
+	}
+
+	s.logger.Println("all games final or posted, checking results")
+	return 1 * time.Minute
 }
 
 func (s *Scheduler) tick() error {

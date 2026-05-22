@@ -81,6 +81,14 @@ type H2HRecord struct {
 	GamesPlayed  int
 }
 
+// GameLiveStatus represents the live state of a game including inning info.
+type GameLiveStatus struct {
+	GamePk        int
+	Status        string // "Preview", "Live", "Final"
+	CurrentInning int
+	InningState   string // "Top", "Middle", "Bottom", "End"
+}
+
 // GameProvider is the interface for fetching MLB data. All business logic
 // depends on this interface, making it trivially mockable in tests.
 type GameProvider interface {
@@ -90,4 +98,5 @@ type GameProvider interface {
 	GetPitcherStats(playerID int) (*PitcherStats, error)
 	GetHeadToHead(opponentID int) (*H2HRecord, error)
 	GetGamesSince(date string) ([]GameResult, error)
+	GetGameLiveStatus(date string) ([]GameLiveStatus, error)
 }
