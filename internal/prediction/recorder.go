@@ -71,8 +71,8 @@ type PredictionHistory struct {
 
 func (h *PredictionHistory) Add(pred PredictionRecord) {
 	h.Predictions = append(h.Predictions, pred)
-	if len(h.Predictions) > 50 {
-		h.Predictions = h.Predictions[len(h.Predictions)-50:]
+	if len(h.Predictions) > 200 {
+		h.Predictions = h.Predictions[len(h.Predictions)-200:]
 	}
 }
 
