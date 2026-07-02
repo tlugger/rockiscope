@@ -319,6 +319,78 @@ func (c *Client) uploadBlob(data []byte, mimeType string) (*BlobRef, error) {
 	return result.Blob, nil
 }
 
+// AuthorFeedItem represents a single post from the author feed.
+type AuthorFeedItem struct {
+	PostURI   string
+	CreatedAt string // "2006-01-02"
+	Text      string
+	IsReply   bool
+}
+
+// GetAuthorFeed fetches all posts from a given actor's feed using the public API.
+// No authentication required.
+func GetAuthorFeed(actor string) ([]AuthorFeedItem, error) {
+	base := "https://public.api.bsky.app/xrpc/app.bsky.feed.getAuthorFeed"
+	var items []AuthorFeedItem
+	cursor := ""
+
+	for {
+		url := base + "?actor=" + actor + "&limit=100"
+		if cursor != "" {
+			url += "&cursor=" + cursor
+		}
+
+		resp, err := http.Get(url)
+		if err != nil {
+			return nil, fmt.Errorf("fetching author feed: %w", err)
+		}
+
+		var body struct {
+			Feed []struct {
+				Post struct {
+					URI    string `json:"uri"`
+					Record struct {
+						CreatedAt string `json:"createdAt"`
+						Text      string `json:"text"`
+						Reply     *struct {
+							Root struct {
+								URI string `json:"uri"`
+							} `json:"root"`
+						} `json:"reply,omitempty"`
+					} `json:"record"`
+				} `json:"post"`
+			} `json:"feed"`
+			Cursor string `json:"cursor,omitempty"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+			resp.Body.Close()
+			return nil, fmt.Errorf("decoding feed response: %w", err)
+		}
+		resp.Body.Close()
+
+		for _, f := range body.Feed {
+			created := f.Post.Record.CreatedAt
+			if len(created) >= 10 {
+				created = created[:10]
+			}
+			items = append(items, AuthorFeedItem{
+				PostURI:   f.Post.URI,
+				CreatedAt: created,
+				Text:      f.Post.Record.Text,
+				IsReply:   f.Post.Record.Reply != nil,
+			})
+		}
+
+		if body.Cursor == "" {
+			break
+		}
+		cursor = body.Cursor
+	}
+
+	return items, nil
+}
+
 // DryRunPoster implements Poster but prints to a callback instead of posting.
 type DryRunPoster struct {
 	OnPost  func(text string)
