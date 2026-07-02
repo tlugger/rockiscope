@@ -148,6 +148,13 @@ func cmdPreview(logger *log.Logger) {
 }
 
 func cmdBackfill(logger *log.Logger) {
+	fromBluesky := false
+	for _, arg := range os.Args[2:] {
+		if arg == "--from-bluesky" {
+			fromBluesky = true
+		}
+	}
+
 	dataDir := getDataDir()
 	hist, err := prediction.LoadHistory(dataDir)
 	if err != nil {
@@ -218,6 +225,18 @@ func cmdBackfill(logger *log.Logger) {
 	sort.SliceStable(hist.Predictions, func(i, j int) bool {
 		return hist.Predictions[i].Date < hist.Predictions[j].Date
 	})
+
+	if fromBluesky {
+		username := os.Getenv("BLUESKY_USERNAME")
+		if username == "" {
+			logger.Fatal("BLUESKY_USERNAME must be set for --from-bluesky")
+		}
+		updated, err := bluesky.BackfillPredictionsFromBluesky(hist, username, logger)
+		if err != nil {
+			logger.Fatalf("bluesky backfill: %v", err)
+		}
+		logger.Printf("bluesky backfill: %d predictions updated", updated)
+	}
 
 	if err := prediction.SaveHistory(hist, dataDir); err != nil {
 		logger.Fatalf("saving history: %v", err)
