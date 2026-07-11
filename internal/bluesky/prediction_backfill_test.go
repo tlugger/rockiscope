@@ -23,8 +23,10 @@ func TestParsePredictionPost_GameDay(t *testing.T) {
 	if pp.Predicted != "L" {
 		t.Errorf("predicted = %q, want %q", pp.Predicted, "L")
 	}
-	if math.Abs(pp.WinProb-0.66) > 0.001 {
-		t.Errorf("winProb = %f, want %f", pp.WinProb, 0.66)
+	// The post shows the defeat probability (66%); WinProbability is P(Rockies
+	// win) = 1 - 0.66 = 0.34.
+	if math.Abs(pp.WinProb-0.34) > 0.001 {
+		t.Errorf("winProb = %f, want %f", pp.WinProb, 0.34)
 	}
 	if pp.Date != "2026-07-01" {
 		t.Errorf("date = %q, want %q", pp.Date, "2026-07-01")

@@ -577,14 +577,22 @@ func (s *Scheduler) recordPrediction(date string, game *mlb.Game, pred predictio
 			factors.Stars = v
 		}
 	}
+	// Prefer MLB's official date over the wall-clock date: it is stable across
+	// time zones and correctly dates double-header game 2 and postponed makeups.
+	recordDate := game.OfficialDate
+	if recordDate == "" {
+		recordDate = date
+	}
+
 	rec := prediction.PredictionRecord{
-		Date:            date,
+		Date:            recordDate,
 		Opponent:        game.Opponent().Name,
 		IsHome:          game.IsHome,
 		Predicted:       pred.Pick,
 		Confidence:     pred.WinProbability * 100,
 		PostURI:         postURI,
 		GamePK:          game.GamePk,
+		GameNumber:      game.GameNumber,
 		WinProbability: pred.WinProbability,
 		Factors:       factors,
 	}
@@ -687,7 +695,15 @@ func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) bool {
 		if p.Actual != "" {
 			continue
 		}
-		if p.GamePK == gr.GamePk || (p.Date == gr.Date && p.Opponent == gr.Opponent) {
+		// Match strictly on gamePk. A date+opponent fallback mis-settles
+		// double-headers (two games share a date+opponent) and never matches a
+		// postponed makeup (its date differs from the original prediction).
+		if gr.GamePk != 0 && p.GamePK == gr.GamePk {
+			// Re-date to the official date in case this game was postponed and
+			// made up on a different day than originally predicted.
+			if gr.Date != "" {
+				p.Date = gr.Date
+			}
 			actual := "L"
 			if gr.Won {
 				actual = "W"

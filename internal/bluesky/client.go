@@ -321,10 +321,11 @@ func (c *Client) uploadBlob(data []byte, mimeType string) (*BlobRef, error) {
 
 // AuthorFeedItem represents a single post from the author feed.
 type AuthorFeedItem struct {
-	PostURI   string
-	CreatedAt string // "2006-01-02"
-	Text      string
-	IsReply   bool
+	PostURI     string
+	CreatedAt   string // date only, "2006-01-02"
+	CreatedAtRaw string // full RFC3339 timestamp as returned by Bluesky
+	Text        string
+	IsReply     bool
 }
 
 // GetAuthorFeed fetches all posts from a given actor's feed using the public API.
@@ -370,15 +371,17 @@ func GetAuthorFeed(actor string) ([]AuthorFeedItem, error) {
 		resp.Body.Close()
 
 		for _, f := range body.Feed {
-			created := f.Post.Record.CreatedAt
+			raw := f.Post.Record.CreatedAt
+			created := raw
 			if len(created) >= 10 {
 				created = created[:10]
 			}
 			items = append(items, AuthorFeedItem{
-				PostURI:   f.Post.URI,
-				CreatedAt: created,
-				Text:      f.Post.Record.Text,
-				IsReply:   f.Post.Record.Reply != nil,
+				PostURI:      f.Post.URI,
+				CreatedAt:    created,
+				CreatedAtRaw: raw,
+				Text:         f.Post.Record.Text,
+				IsReply:      f.Post.Record.Reply != nil,
 			})
 		}
 
