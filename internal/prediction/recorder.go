@@ -60,6 +60,7 @@ type PredictionRecord struct {
 	Synthetic    bool         `json:"synthetic,omitempty"` // backfilled pre-bot record; excluded from prediction-accuracy stats
 	PostURI       string        `json:"postUri,omitempty"`
 	GamePK       int          `json:"gamePk,omitempty"`
+	GameNumber   int          `json:"gameNumber,omitempty"` // 1 or 2 for double-headers
 	Factors      FactorScores  `json:"factors"`
 	WinProbability float64    `json:"winProbability"`
 }

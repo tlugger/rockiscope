@@ -231,7 +231,7 @@ func cmdBackfill(logger *log.Logger) {
 		if username == "" {
 			logger.Fatal("BLUESKY_USERNAME must be set for --from-bluesky")
 		}
-		updated, err := bluesky.BackfillPredictionsFromBluesky(hist, username, logger)
+		updated, err := bluesky.BackfillPredictionsFromBluesky(hist, username, results, logger)
 		if err != nil {
 			logger.Fatalf("bluesky backfill: %v", err)
 		}

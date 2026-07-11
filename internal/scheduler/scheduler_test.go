@@ -393,7 +393,7 @@ func TestCheckForCompletedGames_MatchingResults(t *testing.T) {
 	}
 }
 
-func TestCheckForCompletedGames_MatchesByDateAndOpponent(t *testing.T) {
+func TestCheckForCompletedGames_MatchesByGamePk(t *testing.T) {
 	denver := mlb.DenverLocation()
 	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, denver)
 	poster := &mockPoster{}
@@ -401,7 +401,7 @@ func TestCheckForCompletedGames_MatchesByDateAndOpponent(t *testing.T) {
 	s := &Scheduler{
 		mlb: &mockMLB{
 			gamesSince: []mlb.GameResult{
-				{GamePk: 0, Date: "2026-04-08", Opponent: "Houston Astros", Won: true}, // GamePK not set, tests fallback
+				{GamePk: 778901, Date: "2026-04-08", Opponent: "Houston Astros", Won: true},
 			},
 		},
 		poster:    poster,
@@ -411,7 +411,7 @@ func TestCheckForCompletedGames_MatchesByDateAndOpponent(t *testing.T) {
 		dataDir:   "",
 		predHistory: &prediction.PredictionHistory{
 			Predictions: []prediction.PredictionRecord{
-				{Date: "2026-04-08", Opponent: "Houston Astros", Predicted: "W", GamePK: 0}, // no GamePK
+				{Date: "2026-04-08", Opponent: "Houston Astros", Predicted: "W", GamePK: 778901},
 			},
 			Current: prediction.Weights{WinRate: 0.30, Pitcher: 0.30},
 		},
@@ -428,6 +428,45 @@ func TestCheckForCompletedGames_MatchesByDateAndOpponent(t *testing.T) {
 
 	if len(poster.replies) != 1 {
 		t.Fatalf("expected 1 reply, got %d", len(poster.replies))
+	}
+}
+
+// A record without a gamePk must NOT be settled by a date+opponent guess. That
+// fallback mis-attributed double-header results and never matched postponed
+// makeups; results now bind only on gamePk.
+func TestCheckForCompletedGames_NoDateOpponentFallback(t *testing.T) {
+	denver := mlb.DenverLocation()
+	nowTime := time.Date(2026, 4, 8, 14, 0, 0, 0, denver)
+	poster := &mockPoster{}
+
+	s := &Scheduler{
+		mlb: &mockMLB{
+			gamesSince: []mlb.GameResult{
+				{GamePk: 778901, Date: "2026-04-08", Opponent: "Houston Astros", Won: true},
+			},
+		},
+		poster:  poster,
+		now:     func() time.Time { return nowTime },
+		sleep:   func(d time.Duration) {},
+		logger:  testLogger(),
+		dataDir: "",
+		predHistory: &prediction.PredictionHistory{
+			Predictions: []prediction.PredictionRecord{
+				{Date: "2026-04-08", Opponent: "Houston Astros", Predicted: "W", GamePK: 0},
+			},
+			Current: prediction.Weights{WinRate: 0.30, Pitcher: 0.30},
+		},
+	}
+
+	if err := s.checkForCompletedGames(); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if got := s.predHistory.Predictions[0].Actual; got != "" {
+		t.Errorf("expected record to stay unsettled (no gamePk), got actual = %q", got)
+	}
+	if len(poster.replies) != 0 {
+		t.Errorf("expected no replies, got %d", len(poster.replies))
 	}
 }
 

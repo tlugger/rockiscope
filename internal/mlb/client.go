@@ -74,7 +74,8 @@ func (c *Client) GetHeadToHead(opponentID int) (*H2HRecord, error) {
 
 type GameResult struct {
 	GamePk       int    `json:"gamePk"`
-	Date        string `json:"date"`
+	Date        string `json:"date"` // MLB official date "2006-01-02"
+	GameDateTime time.Time `json:"gameDateTime"` // first-pitch time (UTC)
 	OpponentID  int    `json:"opponentId"`
 	Opponent    string `json:"opponent"`
 	IsHome      bool   `json:"isHome"`
@@ -82,6 +83,7 @@ type GameResult struct {
 	OppScore    int    `json:"oppScore"`
 	Won         bool   `json:"won"`
 	Status     string `json:"status"`
+	GameNumber  int    `json:"gameNumber,omitempty"`
 }
 
 func (c *Client) GetGameLiveStatus(date string) ([]GameLiveStatus, error) {
@@ -134,6 +136,13 @@ func (c *Client) parseGameResults(resp scheduleResponse) []GameResult {
 			if g.Status.AbstractGameState != "Final" {
 				continue
 			}
+			// A postponed/cancelled slot can carry abstractGameState "Final" with a
+			// 0-0 score; skip it so it isn't mistaken for a real result. The played
+			// makeup appears as its own (usually same-gamePk) Final listing.
+			switch g.Status.DetailedState {
+			case "Postponed", "Cancelled", "Canceled":
+				continue
+			}
 
 			gameTime, err := time.Parse(time.RFC3339Nano, g.GameDate)
 			if err != nil {
@@ -143,9 +152,16 @@ func (c *Client) parseGameResults(resp scheduleResponse) []GameResult {
 				}
 			}
 
+			officialDate := g.OfficialDate
+			if officialDate == "" {
+				officialDate = gameTime.Format("2006-01-02")
+			}
+
 			var gr GameResult
 			gr.GamePk = g.GamePk
-			gr.Date = gameTime.Format("2006-01-02")
+			gr.Date = officialDate
+			gr.GameDateTime = gameTime
+			gr.GameNumber = g.GameNumber
 			gr.Status = g.Status.AbstractGameState
 
 			if g.Teams.Away.Team.ID == c.teamID {
@@ -239,12 +255,19 @@ func (c *Client) parseGame(g scheduleGame) (*Game, error) {
 
 	isHome := g.Teams.Home.Team.ID == c.teamID
 
+	officialDate := g.OfficialDate
+	if officialDate == "" {
+		officialDate = gameTime.Format("2006-01-02")
+	}
+
 	game := &Game{
 		GamePk:        g.GamePk,
 		GameDateTime:  gameTime,
+		OfficialDate:  officialDate,
 		Status:        g.Status.AbstractGameState,
 		DetailedState: g.Status.DetailedState,
 		Reason:        g.Status.Reason,
+		RescheduleGameDate: g.RescheduleGameDate,
 		Venue:         g.Venue.Name,
 		IsHome:        isHome,
 		GameNumber:    g.GameNumber,
@@ -476,6 +499,8 @@ type scheduleResponse struct {
 type scheduleGame struct {
 	GamePk     int    `json:"gamePk"`
 	GameDate   string `json:"gameDate"`
+	OfficialDate string `json:"officialDate"`
+	RescheduleGameDate string `json:"rescheduleGameDate"`
 	GameNumber int    `json:"gameNumber"`
 	DoubleHeader string `json:"doubleheader"`
 	Status     struct {

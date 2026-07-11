@@ -6,9 +6,11 @@ import "time"
 type Game struct {
 	GamePk        int
 	GameDateTime  time.Time
+	OfficialDate  string // MLB's canonical game date "2006-01-02"; authoritative over the wall clock
 	Status        string // "Preview", "Live", "Final" (abstractGameState)
 	DetailedState string // "Scheduled", "Postponed", "Cancelled", etc.
 	Reason        string // reason for postponement/cancellation
+	RescheduleGameDate string // official date a postponed game was moved to, if any
 	HomeTeam      TeamInfo
 	AwayTeam      TeamInfo
 	Venue         string
