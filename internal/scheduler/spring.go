@@ -49,8 +49,9 @@ func (s *Scheduler) springTask(season int, r *tickResult) {
 		if s.findPick(pickSpring, g.GamePk) == nil {
 			s.state().Picks = append(s.state().Picks, pick{
 				Kind: pickSpring, Season: season, GamePk: g.GamePk, Date: g.OfficialDate,
-				TeamID: mlb.RockiesID, TeamName: "Colorado Rockies", Opponent: g.Opponent().Name,
+				TeamID: mlb.RockiesID, TeamName: "Colorado Rockies", Opponent: g.Opponent().Name, IsHome: g.IsHome,
 				Pick: post.Prediction.Pick, WinProbability: post.Prediction.WinProbability,
+				Factors: post.Prediction.FactorScores(),
 				PostURI: uri, FirstPitch: g.GameDateTime,
 			})
 			s.saveSeasonState()
@@ -153,6 +154,7 @@ func (s *Scheduler) settleSpringPicks(season int, r *tickResult) {
 			continue
 		}
 		p.Score = fmt.Sprintf("%d-%d", gr.RockiesScore, gr.OppScore)
+		p.TeamScore, p.OppScore = gr.RockiesScore, gr.OppScore
 		s.saveSeasonState()
 	}
 }

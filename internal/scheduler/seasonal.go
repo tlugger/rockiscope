@@ -93,7 +93,7 @@ func (s *Scheduler) runSeasonalTasks(p PhaseInfo) *tickResult {
 		if s.postseasonNeedsWrapUp(p.Season) {
 			s.postseasonTask(p.Season, r)
 		}
-		s.hotStoveTask(r)
+		s.hotStoveTask(p.Season, r)
 		s.countdownTask(p, r)
 	case PhaseSpring:
 		s.rolloverTask(p.Season, r)

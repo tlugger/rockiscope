@@ -354,6 +354,9 @@ func TestPostseason_FullOctober(t *testing.T) {
 	if len(s.state().Picks) != 1 {
 		t.Fatalf("pick not recorded")
 	}
+	if pk := s.state().Picks[0]; pk.Series != "D Game 3" || !pk.IsHome || pk.Factors.Stars == 0 {
+		t.Errorf("pick missing dashboard data: %+v", pk)
+	}
 	if h.season.calls["roster"] != rosterCalls {
 		t.Error("roster readings should be cached")
 	}
@@ -368,6 +371,9 @@ func TestPostseason_FullOctober(t *testing.T) {
 	}
 	if !strings.Contains(replies[0].text, "Padres W 5-3") {
 		t.Errorf("reply text: %s", replies[0].text)
+	}
+	if pk := s.state().Picks[0]; pk.TeamScore != 5 || pk.OppScore != 3 || pk.SeriesResult == "" {
+		t.Errorf("settled pick: %+v", pk)
 	}
 
 	// Game 4: Brewers clinch. Next morning we re-adopt (Dodgers, earth signs).
@@ -542,7 +548,7 @@ func TestHotStove(t *testing.T) {
 	s.state().HotStoveSince = "2026-10-29"
 
 	r := &tickResult{now: h.now}
-	s.hotStoveTask(r)
+	s.hotStoveTask(2026, r)
 	if err := r.err(); err != nil {
 		t.Fatal(err)
 	}
@@ -566,11 +572,21 @@ func TestHotStove(t *testing.T) {
 	if want := denverAt(2026, 11, 10, 17, 0); !r.next.Equal(want) {
 		t.Errorf("next check %s, want %s", r.next, want)
 	}
+	log := s.state().HotStove
+	if len(log) != 5 {
+		t.Fatalf("hot stove log has %d entries, want 5", len(log))
+	}
+	if e := log[0]; e.Sign != "Cancer" || e.Compatibility != 3 || !e.Arriving || e.Season != 2026 || e.PostURI == "" || e.Digest {
+		t.Errorf("first entry: %+v", e)
+	}
+	if !log[3].Digest || !log[4].Digest || log[3].PostURI != log[4].PostURI || log[3].Compatibility != -1 {
+		t.Errorf("digest entries: %+v %+v", log[3], log[4])
+	}
 
 	// Same slot again, and the evening slot after a restart: nothing new.
-	s.hotStoveTask(&tickResult{now: h.now})
+	s.hotStoveTask(2026, &tickResult{now: h.now})
 	h.now = denverAt(2026, 11, 10, 17, 5)
-	h.scheduler().hotStoveTask(&tickResult{now: h.now})
+	h.scheduler().hotStoveTask(2026, &tickResult{now: h.now})
 	if len(h.poster.sent) != 4 {
 		t.Errorf("reposted moves: %d posts", len(h.poster.sent))
 	}
@@ -580,7 +596,7 @@ func TestHotStove_BeforeFirstSlotWaits(t *testing.T) {
 	h := newHarness(t)
 	h.now = denverAt(2026, 11, 10, 7, 0)
 	r := &tickResult{now: h.now}
-	h.scheduler().hotStoveTask(r)
+	h.scheduler().hotStoveTask(2026, r)
 	if h.season.calls["txns"] != 0 {
 		t.Error("checked before the first slot")
 	}
@@ -680,6 +696,9 @@ func TestSpring_PredictsAndSettles(t *testing.T) {
 	}
 	if h.hist.TotalCount() != 0 {
 		t.Error("spring picks leaked into the real prediction history")
+	}
+	if pk := s.state().Picks[0]; pk.TeamScore != 6 || pk.OppScore != 2 || !pk.IsHome || pk.Factors.Stars == 0 {
+		t.Errorf("spring pick: %+v", pk)
 	}
 }
 
@@ -785,5 +804,25 @@ func TestIterate_WaitsForClockSync(t *testing.T) {
 	h.now = time.Date(1970, 1, 1, 0, 0, 0, 0, time.UTC)
 	if d := h.scheduler().iterate(); d != time.Minute || len(h.season.calls) != 0 {
 		t.Errorf("acted on an unsynced clock: sleep=%s calls=%v", d, h.season.calls)
+	}
+}
+
+func TestIterate_RecordsStatusOnChange(t *testing.T) {
+	h := postseasonHarness(t)
+	h.season.dates = map[int]*mlb.SeasonDates{
+		2026: {Season: "2026", SpringStart: "2026-02-20", RegularStart: "2026-03-26", RegularEnd: "2026-09-27", PostEnd: "2026-10-31"},
+	}
+	h.now = denverAt(2026, 10, 6, 10, 0)
+	s := h.scheduler()
+	s.iterate()
+	st := s.state().Status
+	if st.Phase != "postseason" || st.Season != 2026 || st.UpdatedAt == "" {
+		t.Fatalf("status = %+v", st)
+	}
+	stamp := st.UpdatedAt
+	h.now = h.now.Add(time.Hour)
+	s.iterate()
+	if s.state().Status.UpdatedAt != stamp {
+		t.Error("status rewritten without a phase change")
 	}
 }

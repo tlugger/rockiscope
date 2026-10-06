@@ -222,6 +222,7 @@ func (s *Scheduler) iterate() (sleepDur time.Duration) {
 
 	phase := s.CurrentPhase()
 	s.logger.Printf("phase: %s", phase)
+	s.recordStatus(phase)
 
 	if phase.Phase != PhaseRegular {
 		return s.seasonalTick(phase)
@@ -609,27 +610,7 @@ func (s *Scheduler) publish(post formatter.Post) error {
 }
 
 func (s *Scheduler) recordPrediction(date string, game *mlb.Game, pred prediction.Prediction, postURI string) {
-	factors := prediction.FactorScores{}
-	if pred.Factors != nil {
-		if v, ok := pred.Factors["winRate"]; ok {
-			factors.WinRate = v
-		}
-		if v, ok := pred.Factors["pitcher"]; ok {
-			factors.Pitcher = v
-		}
-		if v, ok := pred.Factors["h2h"]; ok {
-			factors.H2H = v
-		}
-		if v, ok := pred.Factors["homeAway"]; ok {
-			factors.HomeAway = v
-		}
-		if v, ok := pred.Factors["momentum"]; ok {
-			factors.Momentum = v
-		}
-		if v, ok := pred.Factors["stars"]; ok {
-			factors.Stars = v
-		}
-	}
+	factors := pred.FactorScores()
 	// Prefer MLB's official date over the wall-clock date: it is stable across
 	// time zones and correctly dates double-header game 2 and postponed makeups.
 	recordDate := game.OfficialDate
