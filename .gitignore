@@ -3,3 +3,9 @@ rockiscope
 *.log
 sample_card.png
 prediction_history.json
+season_state.json
+*.bak
+archive/
+backups/
+rockiscope.new
+rockiscope.prev

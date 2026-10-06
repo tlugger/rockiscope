@@ -5,6 +5,8 @@ import (
 	"log"
 	"os"
 	"sort"
+	// Embed the timezone database so Denver time works even on a minimal OS image.
+	_ "time/tzdata"
 
 	"net/http"
 
@@ -28,7 +30,8 @@ Commands:
   serve        Start the analytics dashboard web server
   post         Force a post right now, skipping the schedule
   retry-post   Retry posting for today's predictions that failed to post to Bluesky
-  preview      Fetch all data and print the post without posting
+  preview      Fetch all data and print what would be posted, without posting or saving anything
+  phase        Show the current season phase (regular season, postseason, offseason, spring)
   backfill     One-time: backfill missing season games and score data into prediction_history.json
   test-auth    Test Bluesky authentication
   test-mlb     Test MLB API connectivity and show today's game
@@ -60,6 +63,8 @@ func main() {
 		cmdRetryPost(logger)
 	case "preview":
 		cmdPreview(logger)
+	case "phase":
+		cmdPhase(logger)
 	case "backfill":
 		cmdBackfill(logger)
 	case "test-auth":
@@ -141,9 +146,20 @@ func cmdPreview(logger *log.Logger) {
 			fmt.Printf("─── Image: %d bytes ───\n", len(b))
 		},
 	}
-	sched := newScheduler(logger, poster)
+	sched := newSchedulerWith(logger, poster, true)
 	if err := sched.RunOnce(); err != nil {
 		logger.Fatalf("preview failed: %v", err)
+	}
+}
+
+func cmdPhase(logger *log.Logger) {
+	sched := newSchedulerWith(logger, &bluesky.DryRunPoster{}, true)
+	p := sched.CurrentPhase()
+	fmt.Printf("Phase:  %s\n", p.Phase)
+	fmt.Printf("Season: %d\n", p.Season)
+	fmt.Printf("Source: %s\n", p.Source)
+	if p.Upcoming != nil {
+		fmt.Printf("Next:   spring %s, opening day %s\n", p.Upcoming.SpringStart, p.Upcoming.RegularStart)
 	}
 }
 
@@ -309,13 +325,19 @@ func cmdTestHoro(logger *log.Logger) {
 }
 
 func newScheduler(logger *log.Logger, poster bluesky.Poster) *scheduler.Scheduler {
-	dataDir := getDataDir()
+	return newSchedulerWith(logger, poster, false)
+}
+
+func newSchedulerWith(logger *log.Logger, poster bluesky.Poster, dryRun bool) *scheduler.Scheduler {
+	client := mlb.NewClient(nil, logger)
 	return scheduler.New(scheduler.Config{
-		MLB:       mlb.NewClient(nil, logger),
+		MLB:       client,
+		Season:    client,
 		Horoscope: horoscope.NewScraper(nil, logger),
 		Poster:    poster,
 		Logger:    logger,
-		DataDir:   dataDir,
+		DataDir:   getDataDir(),
+		DryRun:    dryRun,
 	})
 }
 

@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tlugger/rockiscope/internal/retry"
@@ -25,6 +26,14 @@ type Client struct {
 	now        func() time.Time
 	logger     *log.Logger
 	sleep      func(time.Duration)
+
+	// Requests are spaced at least minInterval apart. The Stats API has no
+	// published limit, so the bot stays well clear of anything that looks abusive.
+	mu          sync.Mutex
+	lastRequest time.Time
+	minInterval time.Duration
+
+	apiBase string // overrides baseURL in tests
 }
 
 func NewClient(httpClient *http.Client, logger *log.Logger) *Client {
@@ -40,7 +49,17 @@ func NewClient(httpClient *http.Client, logger *log.Logger) *Client {
 		now:        time.Now,
 		logger:     logger,
 		sleep:      time.Sleep,
+		minInterval: 500 * time.Millisecond,
 	}
+}
+
+func (c *Client) throttle() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	if wait := c.minInterval - time.Since(c.lastRequest); wait > 0 && !c.lastRequest.IsZero() {
+		c.sleep(wait)
+	}
+	c.lastRequest = time.Now()
 }
 
 func (c *Client) GetTodayGame() (*Game, error) {
@@ -272,6 +291,7 @@ func (c *Client) parseGame(g scheduleGame) (*Game, error) {
 		IsHome:        isHome,
 		GameNumber:    g.GameNumber,
 		DoubleHeader:  g.DoubleHeader,
+		GameType:      g.GameType,
 		HomeTeam: TeamInfo{
 			ID:     g.Teams.Home.Team.ID,
 			Name:   g.Teams.Home.Team.Name,
@@ -299,9 +319,13 @@ func (c *Client) parseGame(g scheduleGame) (*Game, error) {
 }
 
 func (c *Client) parseTeamRecord(resp standingsResponse) (*TeamRecord, error) {
+	return parseTeamRecordFor(resp, c.teamID)
+}
+
+func parseTeamRecordFor(resp standingsResponse, teamID int) (*TeamRecord, error) {
 	for _, record := range resp.Records {
 		for _, team := range record.TeamRecords {
-			if team.Team.ID != c.teamID {
+			if team.Team.ID != teamID {
 				continue
 			}
 			winPct, _ := strconv.ParseFloat(team.WinningPercentage, 64)
@@ -330,7 +354,7 @@ func (c *Client) parseTeamRecord(resp standingsResponse) (*TeamRecord, error) {
 			return rec, nil
 		}
 	}
-	return nil, fmt.Errorf("team %d not found in standings", c.teamID)
+	return nil, fmt.Errorf("team %d not found in standings", teamID)
 }
 
 func (c *Client) parsePlayerStats(resp playerResponse) (*PitcherStats, error) {
@@ -400,7 +424,13 @@ func (c *Client) parseH2H(resp scheduleResponse, opponentID int) *H2HRecord {
 
 func (c *Client) getJSON(url string, v interface{}) error {
 	return retry.RunWith(c.logger, "MLB API", c.sleep, func() error {
-		resp, err := c.httpClient.Get(url)
+		c.throttle()
+		req, err := http.NewRequest("GET", url, nil)
+		if err != nil {
+			return err
+		}
+		req.Header.Set("User-Agent", "Rockiscope (+https://github.com/tlugger/rockiscope)")
+		resp, err := c.httpClient.Do(req)
 		if err != nil {
 			return err
 		}
@@ -503,10 +533,19 @@ type scheduleGame struct {
 	RescheduleGameDate string `json:"rescheduleGameDate"`
 	GameNumber int    `json:"gameNumber"`
 	DoubleHeader string `json:"doubleheader"`
+	GameType          string `json:"gameType"`
+	SeriesDescription string `json:"seriesDescription"`
+	SeriesGameNumber  int    `json:"seriesGameNumber"`
+	GamesInSeries     int    `json:"gamesInSeries"`
+	SeriesStatus      struct {
+		Result           string `json:"result"`
+		ShortDescription string `json:"shortDescription"`
+	} `json:"seriesStatus"`
 	Status     struct {
 		AbstractGameState string `json:"abstractGameState"`
 		DetailedState     string `json:"detailedState"`
 		Reason            string `json:"reason"`
+		StartTimeTBD      bool   `json:"startTimeTBD"`
 	} `json:"status"`
 	Teams  struct {
 		Away scheduleTeam `json:"away"`
@@ -522,7 +561,8 @@ type scheduleGame struct {
 }
 
 type scheduleTeam struct {
-	Score int `json:"score"`
+	Score    int  `json:"score"`
+	IsWinner bool `json:"isWinner"`
 	Team  struct {
 		ID   int    `json:"id"`
 		Name string `json:"name"`

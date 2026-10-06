@@ -7,6 +7,8 @@ import (
 	"os"
 	"path/filepath"
 	"sort"
+
+	"github.com/tlugger/rockiscope/internal/fsutil"
 )
 
 const historyFileName = "prediction_history.json"
@@ -130,7 +132,11 @@ func LoadHistory(dataDir string) (*PredictionHistory, error) {
 	}
 
 	path := filepath.Join(dataDir, historyFileName)
-	data, err := os.ReadFile(path)
+	var hist PredictionHistory
+	data, fromBackup, err := fsutil.ReadFileWithFallback(path, func(b []byte) error {
+		var probe PredictionHistory
+		return json.Unmarshal(b, &probe)
+	})
 	if os.IsNotExist(err) {
 		return &PredictionHistory{
 			Predictions: nil,
@@ -140,8 +146,9 @@ func LoadHistory(dataDir string) (*PredictionHistory, error) {
 	if err != nil {
 		return nil, fmt.Errorf("reading prediction history: %w", err)
 	}
-
-	var hist PredictionHistory
+	if fromBackup {
+		fmt.Fprintf(os.Stderr, "warning: %s was unreadable, recovered from backup\n", path)
+	}
 	if err := json.Unmarshal(data, &hist); err != nil {
 		return nil, fmt.Errorf("parsing prediction history: %w", err)
 	}
@@ -164,11 +171,7 @@ func SaveHistory(h *PredictionHistory, dataDir string) error {
 		return fmt.Errorf("marshaling history: %w", err)
 	}
 
-	if err := os.MkdirAll(dataDir, 0755); err != nil {
-		return fmt.Errorf("creating data dir: %w", err)
-	}
-
-	if err := os.WriteFile(path, data, 0644); err != nil {
+	if err := fsutil.WriteFileAtomic(path, data, 0644); err != nil {
 		return fmt.Errorf("writing history: %w", err)
 	}
 	return nil
