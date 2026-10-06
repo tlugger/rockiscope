@@ -18,6 +18,8 @@
     --green: #7BE0AD;
     --red: #FF8A9B;
     --yellow: #FFD07B;
+    --good-mark: #3BAC6C;
+    --bad-mark: #C2384E;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -224,36 +226,33 @@
     .pagination { gap: 6px; }
   }
 
-  /* ── season navigation ── */
-  .nav {
+  /* ── header toolbar: links centered, season/phase pickers right ── */
+  .toolbar {
+    display: grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items: center;
     max-width: 1200px;
-    margin: 0 auto 16px;
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
+    margin: 12px auto 0;
   }
-  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-  .chip-row .chip {
-    font-size: 13px;
-    padding: 6px 14px;
-    border-radius: 20px;
+  .toolbar .links { margin-top: 0; }
+  .pickers { justify-self: end; display: flex; gap: 8px; }
+  .pickers select {
+    appearance: none;
+    -webkit-appearance: none;
+    background: var(--card-bg) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23C8AAFF' stroke-width='1.5'/%3E%3C/svg%3E") no-repeat right 11px center;
     border: 1px solid var(--card-border);
-    background: var(--card-bg);
+    border-radius: 8px;
     color: var(--text);
+    font: inherit;
+    font-size: 13px;
+    padding: 7px 30px 7px 12px;
     cursor: pointer;
-    transition: all 0.15s;
-    font-family: inherit;
+    transition: border-color 0.15s;
   }
-  .chip-row .chip:hover, .chip-row .chip.active {
-    background: rgba(200,170,255,0.15);
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-  .chip-row .chip .live-dot {
-    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
-    background: var(--green); margin-right: 6px; vertical-align: 1px;
-  }
-  .tabs .chip { border-radius: 8px; }
+  .pickers select:hover:not(:disabled) { border-color: var(--accent); }
+  .pickers select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .pickers select:disabled { cursor: default; opacity: 0.75; }
+  .pickers option { background: #1E1240; color: var(--text); }
 
   /* ── phase banner ── */
   .banner {
@@ -309,9 +308,36 @@
   .num { font-variant-numeric: tabular-nums; }
 
 
+  /* ── expandable game log ── */
+  table.log tr.game { cursor: pointer; }
+  table.log tr.game td:first-child { white-space: nowrap; }
+  table.log tr.game:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+  table.log tr.game.open td { background: rgba(200,170,255,0.06); border-bottom-color: transparent; }
+  .chev-col { width: 28px; text-align: right; }
+  .chev { display: inline-block; color: var(--text-dim); font-size: 16px; transition: transform 0.15s; }
+  tr.game.open .chev { transform: rotate(90deg); color: var(--accent); }
+  tr.detail-row td { background: rgba(200,170,255,0.06); padding: 4px 12px 16px; }
+  .detail { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1.4fr); gap: 14px 28px; }
+  .detail-col { display: flex; flex-direction: column; gap: 10px; margin: 0; }
+  .detail-col dt { color: var(--text-dim); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 2px; }
+  .detail-col dd { margin: 0; font-size: 13px; line-height: 1.4; }
+  .factor-bars { font-size: 12px; }
+  .fb-title { color: var(--text-dim); font-size: 10px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 6px; }
+  .fb-title .pending { text-transform: none; letter-spacing: 0; }
+  .fb-row { display: grid; grid-template-columns: 92px 1fr 36px; align-items: center; gap: 8px; margin: 3px 0; }
+  .fb-label { color: var(--text-dim); }
+  .fb-track { position: relative; height: 8px; background: rgba(255,255,255,0.05); border-radius: 4px; }
+  .fb-mid { position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: rgba(230,220,255,0.35); }
+  .fb-fill { position: absolute; top: 0; bottom: 0; border-radius: 4px; }
+  .fb-fill.up { background: var(--good-mark); }
+  .fb-fill.down { background: var(--bad-mark); }
+  .fb-val { text-align: right; }
+  .detail-links { grid-column: 1 / -1; display: flex; gap: 18px; }
+
   /* ── analysis ── */
-  .caption { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin-top: 10px; }
-  .caption b { color: var(--text); }
+  .facts { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 10px; font-size: 12px; color: var(--text-dim); }
+  .facts.center { justify-content: center; margin: 2px 0 12px; }
+  .facts b { color: var(--text); font-weight: 600; }
   .versus { display: flex; align-items: center; justify-content: center; gap: 24px; text-align: center; margin: 4px 0 6px; }
   .versus .big { font-size: 40px; font-weight: 700; color: var(--accent); line-height: 1; }
   .versus .label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
@@ -325,8 +351,8 @@
     display: inline-flex; align-items: center; justify-content: center;
     width: 20px; height: 20px; border-radius: 4px; font-size: 10px; font-weight: 700; color: #fff;
   }
-  .cal-hit { background: #2FA3BC; }
-  .cal-miss { background: #D9587D; }
+  .cal-hit { background: #3BAC6C; }
+  .cal-miss { background: #C2384E; }
   .cal-syn { background: rgba(230,220,255,0.18); color: var(--text-dim) !important; }
   .calendar span:hover { outline: 2px solid var(--accent); outline-offset: 1px; }
   .cal-legend { color: var(--text-dim); font-size: 12px; margin-top: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
@@ -335,8 +361,13 @@
   @media (max-width: 768px) {
     .banner { padding: 12px; gap: 10px; }
     .banner .side { text-align: left; }
-    .chip-row .chip { font-size: 12px; padding: 6px 11px; }
+    .toolbar { grid-template-columns: 1fr; gap: 12px; }
+    .toolbar > .spacer { display: none; }
+    .pickers { justify-self: stretch; }
+    .pickers select { flex: 1; min-width: 0; }
     .feed li { gap: 8px; }
+    .detail { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px 16px; }
+    .factor-bars { grid-column: 1 / -1; }
   }
 </style>
 </head>
@@ -347,6 +378,8 @@
     <h1>Rockiscope Analytics</h1>
   </div>
   <p>Colorado Rockies prediction performance &mdash; powered by the cosmos</p>
+  <div class="toolbar">
+  <div class="spacer"></div>
   <div class="links">
     <a href="https://github.com/tlugger/rockiscope" target="_blank" rel="noopener" title="View source on GitHub" aria-label="GitHub repository">
       <img src="https://cdn.simpleicons.org/github/C8AAFF" alt="GitHub">
@@ -355,13 +388,14 @@
       <img src="https://cdn.simpleicons.org/bluesky/C8AAFF" alt="Bluesky">
     </a>
   </div>
+  <div class="pickers">
+    <select id="seasonSelect" aria-label="Season"></select>
+    <select id="viewSelect" aria-label="Part of the season" hidden></select>
+  </div>
+  </div>
 </header>
 
 <div id="banner"></div>
-<nav class="nav" aria-label="Seasons">
-  <div class="chip-row" id="seasonBar" role="tablist"></div>
-  <div class="chip-row tabs" id="viewTabs" role="tablist"></div>
-</nav>
 <main id="view"></main>
 
 <script>
@@ -369,10 +403,13 @@
 // surface (dataviz validator): correct/win, wrong/loss, primary, secondary.
 const COLORS = {
   accent: '#C8AAFF',
-  good: '#2FA3BC',
-  bad: '#D9587D',
+  good: '#3BAC6C',
+  bad: '#C2384E',
   primary: '#9C7BE6',
   secondary: '#B5862A',
+  // "Star color" for anything that is the horoscope's own line. Deliberately
+  // brighter than the series band so the stars stand out; ΔE 33 from purple.
+  star: '#F2C14E',
   neutral: 'rgba(230,220,255,0.28)',
   text: '#E6DCFF',
   textDim: 'rgba(230,220,255,0.5)',
@@ -380,6 +417,17 @@ const COLORS = {
   surface: '#22123F',
 };
 const alpha = (hex, a) => hex + Math.round(a * 255).toString(16).padStart(2, '0');
+
+// Legend swatches that match the mark: a line for line datasets, a box for bars.
+const markLegend = {
+  color: 'rgba(230,220,255,0.5)', font: { size: 11 }, usePointStyle: true,
+  generateLabels: c => Chart.defaults.plugins.legend.labels.generateLabels(c).map(l => {
+    const ds = c.data.datasets[l.datasetIndex];
+    const isLine = (ds.type || c.config.type) === 'line';
+    const color = isLine ? ds.borderColor : ds.backgroundColor;
+    return { ...l, pointStyle: isLine ? 'line' : 'rect', strokeStyle: color, fillStyle: color, lineWidth: isLine ? 2 : 0 };
+  }),
+};
 
 const CHART_DEFAULTS = {
   responsive: true,
@@ -514,7 +562,23 @@ function availableViews(d) {
   return v;
 }
 
+// When each phase last had activity, for picking a sensible default.
+function lastActivity(d, view) {
+  const max = xs => xs.filter(Boolean).sort().pop() || '';
+  switch (view) {
+    case 'regular': return max(d.regular.map(g => g.date));
+    case 'postseason': return max([...d.postseason.games.map(g => g.date), ...d.postseason.adoptions.map(a => a.adoptedOn), d.postseason.championDate]);
+    case 'spring': return max(d.spring.map(g => g.date));
+    case 'hotstove': return max(d.hotStove.map(m => m.date));
+  }
+  return '';
+}
+
 function defaultView(d, views) {
+  if (d.live && !d.phase) {
+    // No phase status on file: open whatever happened most recently.
+    return views.slice().sort((a, b) => lastActivity(d, b).localeCompare(lastActivity(d, a)))[0] || null;
+  }
   if (d.live) {
     const byPhase = {
       'postseason': ['postseason', 'regular'],
@@ -535,12 +599,12 @@ async function route() {
   const main = document.getElementById('view');
 
   if (!app.season) {
-    document.getElementById('viewTabs').innerHTML = '';
+    renderTabs([]);
     main.innerHTML = emptyState('🔭', 'No predictions yet. The stars are still warming up.');
     return;
   }
   if (app.season === 'all') {
-    document.getElementById('viewTabs').innerHTML = '';
+    renderTabs([]);
     renderAllTime(main);
     return;
   }
@@ -567,22 +631,21 @@ async function route() {
 }
 
 function renderSeasonBar() {
-  const chips = app.seasons.map(s => {
-    const active = s.season === app.season ? ' active' : '';
-    const dot = s.live ? '<span class="live-dot" title="Live"></span>' : '';
-    return `<button class="chip${active}" role="tab" aria-selected="${!!active}" onclick="go(${s.season})">${dot}${s.season}</button>`;
-  });
-  if (app.seasons.length) {
-    const active = app.season === 'all' ? ' active' : '';
-    chips.push(`<button class="chip${active}" role="tab" aria-selected="${!!active}" onclick="go('all')">📚 All-time</button>`);
-  }
-  document.getElementById('seasonBar').innerHTML = chips.join('');
+  const sel = document.getElementById('seasonSelect');
+  sel.innerHTML = app.seasons.map(s => `<option value="${s.season}">${s.season}${s.live ? ' · live' : ''}</option>`).join('')
+    + (app.seasons.length ? '<option value="all">📚 All-time</option>' : '');
+  sel.disabled = !app.seasons.length;
+  sel.hidden = !app.seasons.length;
+  sel.value = String(app.season ?? '');
 }
 
+// The phase picker lists only phases with data; it hides for All-time.
 function renderTabs(views) {
-  document.getElementById('viewTabs').innerHTML = views.length > 1 ? views.map(v =>
-    `<button class="chip${v === app.view ? ' active' : ''}" role="tab" aria-selected="${v === app.view}" onclick="go(${app.season}, '${v}')">${VIEWS[v]}</button>`
-  ).join('') : '';
+  const sel = document.getElementById('viewSelect');
+  sel.hidden = !views.length;
+  sel.innerHTML = views.map(v => `<option value="${v}">${VIEWS[v]}</option>`).join('');
+  sel.value = app.view || '';
+  sel.disabled = views.length <= 1;
 }
 
 // ── phase banner ─────────────────────────────────────────────────────
@@ -651,11 +714,14 @@ const hit = g => g.predicted === g.actual;
 const pickConf = g => g.predicted === 'W' ? g.winProbability : 1 - g.winProbability;
 const signed = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);
 
-// Factor colors for the weights pie, ordered so neighboring slices (including
-// the wrap-around) pass the CVD check. Slices are also direct-labeled.
+// Factor colors for the weights pie: muted tones from the dashboard's own
+// blue/teal/violet family, with Stars in star gold. Dark and light tones
+// alternate around the ring so neighboring slices (including the wrap-around)
+// stay distinct under CVD (worst neighbor ΔE 11.3) and every slice clears 3:1
+// contrast. Slices are direct-labeled, so non-neighbors never rely on color.
 const FACTOR_COLORS = {
-  winRate: '#2FA3BC', pitcher: '#D9587D', h2h: '#B5862A',
-  homeAway: '#5A8BE8', momentum: '#C7792E', stars: '#9C7BE6',
+  winRate: '#4D70B2', pitcher: '#1AA9A5', h2h: '#915A95',
+  homeAway: '#3F9FCB', momentum: '#A8545D', stars: '#F2C14E',
 };
 
 // The engine's confidence phrases, as they appear in posts.
@@ -667,121 +733,165 @@ const CONFIDENCE = [
   ['scream', 'The stars are screaming'],
 ];
 
-// Bot vs a baseline, game by game. Regular season: "always pick L" (the
-// pessimist). Postseason/spring: a coin flip.
-function renderRaceChart(id, titleId, completed, baseline) {
-  const labels = [], lead = [];
+// Exact binomial tests against p = 0.5 (fine for a season's worth of games).
+function binomPmf(n) {
+  const pmf = [Math.pow(0.5, n)];
+  for (let i = 0; i < n; i++) pmf.push(pmf[i] * (n - i) / (i + 1));
+  return pmf;
+}
+// Two-sided sign test: how surprising is a k-vs-(n-k) split if both sides were equal?
+function signTest(k, n) {
+  if (!n) return 1;
+  const pmf = binomPmf(n), cut = pmf[k] * (1 + 1e-9);
+  return Math.min(1, pmf.reduce((a, v) => a + (v <= cut ? v : 0), 0));
+}
+// One-sided: chance a fair coin gets k or more right out of n.
+function coinTail(k, n) {
+  if (!n) return 1;
+  return Math.min(1, binomPmf(n).slice(k).reduce((a, v) => a + v, 0));
+}
+function fmtP(p) { return p < 0.001 ? 'p < 0.001' : `p = ${p < 0.01 ? p.toFixed(3) : p.toFixed(2)}`; }
+const pct1 = (k, n) => n ? `${((k / n) * 100).toFixed(1)}%` : '—';
+
+// The bot against the simplest strategy that needs no model at all. Regular
+// season: "The Pessimist" predicts a Rockies loss every game. Postseason and
+// spring: a coin flip.
+function baselinePanel(prefix, completed, baseline, team) {
+  const n = completed.length, bot = completed.filter(hit).length;
+  const facts = [`Bot <b>${pct1(bot, n)}</b>`];
+  if (baseline === 'pessimist') {
+    const pess = completed.filter(g => g.actual === 'L').length;
+    const disagree = completed.filter(g => g.predicted === 'W');
+    const botWins = disagree.filter(g => g.actual === 'W').length;
+    facts.push(`Pessimist <b>${pct1(pess, n)}</b>`);
+    if (disagree.length) {
+      const p = signTest(botWins, disagree.length);
+      facts.push(`Disagreed <b>${disagree.length}×</b>: bot ${botWins}, Pessimist ${disagree.length - botWins}`,
+        `${fmtP(p)} · ${p < 0.05 ? 'not luck' : 'could be luck'}`);
+    }
+  } else {
+    const p = coinTail(bot, n);
+    facts.push(`vs a coin: ${fmtP(p)} · ${p < 0.05 ? 'beating chance' : 'could be luck'}`);
+  }
+  return `${canvas(prefix + 'Race', 260)}<div class="facts">${facts.map(f => `<span>${f}</span>`).join('')}</div>`;
+}
+
+// Early-season accuracy swings between 0% and 100%; with a real sample,
+// start drawing once there are 10 games to average.
+const RACE_WARMUP = 10;
+const raceStart = n => n >= 30 ? RACE_WARMUP - 1 : 0;
+
+function drawBaselineChart(id, completed, baseline) {
+  const labels = [], botAcc = [], baseAcc = [];
+  const start = raceStart(completed.length);
   let bot = 0, base = 0;
   completed.forEach((g, i) => {
     bot += hit(g) ? 1 : 0;
     base += baseline === 'pessimist' ? (g.actual === 'L' ? 1 : 0) : 0.5;
+    if (i < start) return;
     labels.push(g.date.slice(5));
-    lead.push(+(bot - base).toFixed(1));
+    botAcc.push(+((bot / (i + 1)) * 100).toFixed(1));
+    baseAcc.push(+((base / (i + 1)) * 100).toFixed(1));
   });
-  const final = lead.length ? lead[lead.length - 1] : 0;
-  const rival = baseline === 'pessimist' ? 'the Pessimist' : 'a Coin Flip';
-  const title = document.getElementById(titleId);
-  if (title) {
-    title.textContent = `The Bot vs. ${rival} · ` + (!lead.length ? 'no games yet'
-      : final > 0 ? `bot leads by ${final}` : final < 0 ? `${baseline === 'pessimist' ? 'pessimist' : 'coin'} leads by ${-final}` : 'dead even');
+  const datasets = [
+    { label: 'Bot', data: botAcc, borderColor: COLORS.primary, borderWidth: 2.5, tension: 0.25, pointRadius: 0, pointHoverRadius: 5 },
+  ];
+  if (baseline === 'pessimist') {
+    datasets.push({ label: 'The Pessimist (always picks a loss)', data: baseAcc, borderColor: COLORS.secondary, borderWidth: 2, borderDash: [6, 4], tension: 0.25, pointRadius: 0, pointHoverRadius: 5 });
   }
+  datasets.push({ label: 'Coin flip (50%)', data: labels.map(() => 50), borderColor: COLORS.neutral, borderWidth: 1, borderDash: [2, 4], pointRadius: 0 });
 
   chart(id, {
     type: 'line',
-    data: {
-      labels,
-      datasets: [{
-        label: baseline === 'pessimist' ? 'Games ahead of "always pick L"' : 'Games ahead of a coin flip',
-        data: lead, borderColor: COLORS.primary, borderWidth: 2, tension: 0.25,
-        pointRadius: completed.length > 60 ? 0 : 3, pointHoverRadius: 6,
-        fill: { target: 'origin', above: alpha(COLORS.good, 0.25), below: alpha(COLORS.bad, 0.25) },
-      }]
-    },
+    data: { labels, datasets },
     options: {
       ...CHART_DEFAULTS,
       interaction: { mode: 'index', intersect: false },
       plugins: {
         ...CHART_DEFAULTS.plugins,
-        legend: { display: false },
+        legend: { labels: { color: COLORS.textDim, font: { size: 11 }, usePointStyle: true, pointStyle: 'line' } },
         tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: {
-          title: items => { const g = completed[items[0].dataIndex]; return `${g.date} vs ${g.opponent}`; },
-          label: item => { const g = completed[item.dataIndex], v = item.raw;
-            return [`Bot ${hit(g) ? '✓ right' : '✗ wrong'} (said ${g.predicted}, got ${g.actual})`,
-              v > 0 ? `Bot ahead by ${v}` : v < 0 ? `Bot behind by ${-v}` : 'Dead even']; } } }
+          title: items => { const i = items[0].dataIndex + start, g = completed[i]; return `Game ${i + 1}: ${g.date} vs ${g.opponent}`; },
+          label: i => `${i.dataset.label}: ${i.raw}% right so far`,
+          footer: () => start ? `Lines start at game ${RACE_WARMUP}.` : '' } }
       },
       scales: {
         x: { ...CHART_DEFAULTS.scales.x, ticks: { ...CHART_DEFAULTS.scales.x.ticks, maxTicksLimit: 12 } },
-        y: { ...CHART_DEFAULTS.scales.y,
-          title: { display: true, text: '← behind · games · ahead →', color: COLORS.textDim, font: { size: 11 } },
-          grid: { ...CHART_DEFAULTS.scales.y.grid,
-            color: ctx => ctx.tick.value === 0 ? 'rgba(200,170,255,0.45)' : COLORS.grid,
-            lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1 } }
+        y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100,
+          title: { display: true, text: 'Season accuracy so far', color: COLORS.textDim, font: { size: 11 } },
+          ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } }
       }
     }
   });
 }
 
-// When the horoscope and the stats disagreed, who was right? Plus how the
-// team did by horoscope mood.
+// Stars vs Science sits beside Confidence; the scoreboard (~100px) plus this
+// chart matches the confidence chart's height.
+const PAIRED_PANEL_HEIGHT = 330;
+const STARS_CHART_HEIGHT = 230;
+
+// Stars vs Science: when the horoscope and the stats leaned opposite ways,
+// who was right? Plus a check of the horoscope's "odds" against reality.
+const STAR_BINS = [[0, 0.2, '0–20%'], [0.2, 0.4, '20–40%'], [0.4, 0.6, '40–60%'], [0.6, 0.8, '60–80%'], [0.8, 1.01, '80–100%']];
 function starsVsScience(completed) {
   let stars = 0, science = 0;
-  const buckets = { doom: [0, 0], meh: [0, 0], glowing: [0, 0] };
+  const bins = STAR_BINS.map(() => [0, 0]);
   completed.forEach(g => {
     const f = g.factors || {};
     if (!f.stars) return;
     const won = g.actual === 'W';
-    const b = f.stars < 0.33 ? 'doom' : f.stars > 0.66 ? 'glowing' : 'meh';
-    buckets[b][won ? 0 : 1]++;
-    const others = FACTORS.map(([k]) => f[k]).filter((v, i) => FACTORS[i][0] !== 'stars' && v);
+    const bi = STAR_BINS.findIndex(([lo, hi]) => f.stars >= lo && f.stars < hi);
+    if (bi >= 0) bins[bi][won ? 0 : 1]++;
+    const others = FACTORS.filter(([k]) => k !== 'stars').map(([k]) => f[k]).filter(Boolean);
     if (!others.length) return;
     const sci = others.reduce((a, v) => a + v, 0) / others.length;
     if ((f.stars > 0.5) !== (sci > 0.5)) (f.stars > 0.5) === won ? stars++ : science++;
   });
-  return { stars, science, buckets };
+  return { stars, science, bins };
 }
 
 function starsVsSciencePanel(id, completed, team) {
-  const { stars, science, buckets } = starsVsScience(completed);
-  const [gw, gl] = buckets.glowing, [dw, dl] = buckets.doom;
-  let quip = 'Not enough disagreements to settle it yet.';
-  if (stars + science >= 5) {
-    quip = science > stars ? 'Science wins. The stars have been notified.' : stars > science ? 'The stars win. Science is in shambles.' : 'A dead heat. The universe shrugs.';
-  }
-  let mood = '';
-  if (gw + gl && dw + dl) {
-    const gp = gw / (gw + gl), dp = dw / (dw + dl);
-    mood = gp < dp ? `When the stars were glowing, the ${esc(team)} went <b>${gw}-${gl}</b>. Worse than when they said doom (${dw}-${dl}).`
-      : `When the stars were glowing, the ${esc(team)} went <b>${gw}-${gl}</b>. When they said doom, ${dw}-${dl}.`;
-  }
+  const { stars, science } = starsVsScience(completed);
+  const n = stars + science, p = signTest(Math.max(stars, science), n);
+  const sig = n >= 5 ? ` · ${fmtP(p)} · ${p < 0.05 ? 'not luck' : 'could be luck'}` : '';
   return `<div class="versus">
       <div><div class="big num">${science}</div><div class="label">🔬 Science</div></div>
       <div class="vs">vs</div>
       <div><div class="big num">${stars}</div><div class="label">🔮 Stars</div></div>
     </div>
-    <p class="caption">Games where the horoscope disagreed with the stats, and who called it. ${quip}</p>
-    ${canvas(id, 170)}
-    ${mood ? `<p class="caption">${mood}</p>` : ''}`;
+    <div class="facts center"><span>Who called it when they disagreed (${n} games)${sig}</span></div>
+    ${canvas(id, STARS_CHART_HEIGHT)}`;
 }
 
-function drawStarsBuckets(id, completed, team) {
-  const { buckets } = starsVsScience(completed);
-  const keys = [['doom', '🌑 Doom (<33%)'], ['meh', '🌗 Meh'], ['glowing', '🌕 Glowing (>66%)']];
+function drawStarsChart(id, completed, team) {
+  const { bins } = starsVsScience(completed);
   chart(id, {
-    type: 'bar',
     data: {
-      labels: keys.map(([, l]) => l),
-      datasets: [{ label: `${team} win %`,
-        data: keys.map(([k]) => { const [w, l] = buckets[k]; return w + l ? +((w / (w + l)) * 100).toFixed(1) : null; }),
-        backgroundColor: alpha(COLORS.primary, 0.8), borderRadius: 4, maxBarThickness: 48 }]
+      labels: STAR_BINS.map(([, , l], i) => [l, `${bins[i][0]}-${bins[i][1]}`]),
+      datasets: [
+        { type: 'bar', label: `${team} actually won`, order: 2,
+          data: bins.map(([w, l]) => w + l ? +((w / (w + l)) * 100).toFixed(1) : null),
+          backgroundColor: alpha(COLORS.primary, 0.8), borderRadius: 4, maxBarThickness: 44 },
+        { type: 'line', label: 'What the stars promised', order: 1,
+          data: STAR_BINS.map(([lo, hi]) => Math.round(((lo + Math.min(hi, 1)) / 2) * 100)),
+          borderColor: COLORS.star, borderWidth: 2, borderDash: [6, 4], pointRadius: 4, pointBackgroundColor: COLORS.star, fill: false },
+      ]
     },
     options: {
       ...CHART_DEFAULTS,
-      plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false },
+      plugins: { ...CHART_DEFAULTS.plugins,
+        legend: { labels: markLegend },
         tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: {
-          label: i => { const [w, l] = buckets[keys[i.dataIndex][0]]; return `${team} ${w}-${l} (${i.raw}%)`; } } } },
-      scales: { x: { ...CHART_DEFAULTS.scales.x, grid: { display: false } },
-        y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100, title: { display: true, text: `${team} win %`, color: COLORS.textDim, font: { size: 11 } },
-          ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } }
+          title: items => `Horoscope odds ${STAR_BINS[items[0].dataIndex][2]}`,
+          label: i => { const [w, l] = bins[i.dataIndex];
+            return i.dataset.type === 'line' ? `Stars promised ~${i.raw}%` : `${team} won ${i.raw ?? '—'}% (${w}-${l})`; } } } },
+      scales: {
+        x: { ...CHART_DEFAULTS.scales.x, grid: { display: false },
+          title: { display: true, text: `Horoscope's odds of a ${team} win`, color: COLORS.textDim, font: { size: 11 } } },
+        y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100,
+          title: { display: true, text: 'Win %', color: COLORS.textDim, font: { size: 11 } },
+          ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } }
+      }
     }
   });
 }
@@ -794,12 +904,7 @@ function confidencePanel(id, completed) {
     const gs = completed.filter(g => bucket(g) === k);
     return { k, label, n: gs.length, right: gs.filter(hit).length };
   });
-  const never = groups.filter(g => !g.n).map(g => `“${g.label}”`);
-  const maxConf = completed.length ? Math.round(Math.max(...completed.map(pickConf)) * 100) : 0;
-  const caption = completed.length
-    ? `Its boldest pick was ${maxConf}%.` + (never.length ? ` It never once said ${never.join(' or ')}.` : '')
-    : '';
-  return { html: `${canvas(id, 220)}<p class="caption">${caption}</p>`, groups };
+  return { html: canvas(id, PAIRED_PANEL_HEIGHT), groups };
 }
 
 function drawConfidence(id, groups) {
@@ -858,15 +963,15 @@ function drawTrustDrift(id, titleId, completed) {
   const path = replayWeights(completed);
   if (!path.length) return;
   const starsPath = path.map(p => +(p.w.stars * 100).toFixed(1));
-  const peak = Math.max(...starsPath), low = Math.min(...starsPath), end = starsPath[starsPath.length - 1];
+  const end = starsPath[starsPath.length - 1];
   const title = document.getElementById(titleId);
   if (title) title.textContent = `Trust in the Stars · ${Math.round(DEFAULT_WEIGHTS.stars * 100)}% → ${end.toFixed(1)}%`;
   const datasets = FACTORS.filter(([k]) => k !== 'stars').map(([k, label], i) => ({
     label: i === 0 ? 'Other factors' : label, factorName: label,
     data: path.map(p => +(p.w[k] * 100).toFixed(1)),
-    borderColor: COLORS.neutral, borderWidth: 1, pointRadius: 0, tension: 0.2,
+    borderColor: alpha(COLORS.primary, 0.65), borderWidth: 1.5, pointRadius: 0, tension: 0.2,
   }));
-  datasets.unshift({ label: '🔮 Stars', factorName: 'Stars', data: starsPath, borderColor: COLORS.primary, borderWidth: 3, pointRadius: 0, tension: 0.2 });
+  datasets.unshift({ label: '⭐ Stars', factorName: 'Stars', data: starsPath, borderColor: COLORS.star, borderWidth: 3, pointRadius: 0, tension: 0.2 });
   chart(id, {
     type: 'line',
     data: { labels: path.map(p => p.date.slice(5)), datasets },
@@ -874,19 +979,21 @@ function drawTrustDrift(id, titleId, completed) {
       ...CHART_DEFAULTS,
       interaction: { mode: 'index', intersect: false },
       plugins: { ...CHART_DEFAULTS.plugins,
-        legend: { labels: { color: COLORS.textDim, font: { size: 11 }, usePointStyle: true, pointStyle: 'line', filter: item => item.datasetIndex <= 1 } },
+        legend: { labels: { ...markLegend, filter: item => item.datasetIndex <= 1 } },
         tooltip: { ...CHART_DEFAULTS.plugins.tooltip, itemSort: (a, b) => b.raw - a.raw,
-          callbacks: { label: i => `${i.dataset.factorName}: ${i.raw}%` } } },
+          callbacks: { label: i => `${i.dataset.factorName}: ${i.raw}%`,
+            footer: () => 'Rebuilt by replaying the engine\'s weight updates' } } },
       scales: { x: { ...CHART_DEFAULTS.scales.x, ticks: { ...CHART_DEFAULTS.scales.x.ticks, maxTicksLimit: 10 } },
         y: { ...CHART_DEFAULTS.scales.y, min: 0, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } }
     }
   });
-  const cap = document.getElementById(id + 'Cap');
-  if (cap) {
-    const iPeak = starsPath.indexOf(peak), iLow = starsPath.indexOf(low);
-    cap.innerHTML = `Peaked at ${peak.toFixed(1)}% (${esc(fmtDate(path[iPeak].date))}), bottomed out at ${low.toFixed(1)}% (${esc(fmtDate(path[iLow].date))}).
-      <span class="pending">Reconstructed by replaying the engine's weight updates game by game.</span>`;
-  }
+}
+
+// True for colors bright enough to need dark text (WCAG relative luminance).
+function isLight(hex) {
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4;
 }
 
 // Draws each slice's name and share on the slice itself.
@@ -897,12 +1004,12 @@ const sliceLabels = {
     const meta = c.getDatasetMeta(0);
     ctx.save();
     ctx.font = '600 11px system-ui, sans-serif';
-    ctx.fillStyle = '#fff';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     meta.data.forEach((arc, i) => {
       const v = c.data.datasets[0].data[i];
       if (v < 6) return;
+      ctx.fillStyle = isLight(c.data.datasets[0].backgroundColor[i]) ? '#1E1240' : '#fff';
       const p = arc.tooltipPosition();
       ctx.fillText(c.data.labels[i], p.x, p.y - 6);
       ctx.fillText(Math.round(v) + '%', p.x, p.y + 7);
@@ -984,7 +1091,7 @@ function seasonCalendar(games) {
   }).join('');
   return `<div class="calendar">${rows}</div>
     <div class="cal-legend"><span class="cal-hit">W</span> bot right <span class="cal-miss">W</span> bot wrong
-      <span class="cal-syn">W</span> before the bot · letter = result · hover for details, click for the post</div>`;
+      <span class="cal-syn">W</span> before the bot</div>`;
 }
 
 function highlightsPanel(games, { title, summary, baseline = 'pessimist', team = 'Rockies' }) {
@@ -1019,28 +1126,99 @@ function highlightsPanel(games, { title, summary, baseline = 'pessimist', team =
 // ── game log ─────────────────────────────────────────────────────────
 
 const PAGE_SIZE = 20;
+
+// The engine's confidence phrase for a win probability (as posted).
+function confidencePhrase(wp) {
+  const d = Math.abs(wp - 0.5);
+  return CONFIDENCE.find(([k]) => k === (d > 0.30 ? 'scream' : d > 0.20 ? 'strong' : d > 0.10 ? 'lean' : d > 0.05 ? 'nudge' : 'coin'))[1];
+}
+
+function starterLine(st) {
+  if (!st) return '<span class="pending">Not recorded</span>';
+  const stats = st.hasStats ? ` <span class="pending">(${st.era.toFixed(2)} ERA · ${st.whip.toFixed(2)} WHIP that day)</span>` : '';
+  return `${esc(st.name)}${stats}`;
+}
+
+// Everything the history knows about one game, shown when its row is expanded.
+function gameDetail(g) {
+  const team = nickname(g.team) || 'Rockies';
+  const opp = nickname(g.opponent);
+  const done = g.actual && !g.synthetic;
+  // Column 1: the game itself. Column 2: the prediction.
+  const game = [['Where', `${g.isHome ? 'Home vs' : 'Away @'} ${esc(g.opponent)}${g.gameNumber === 2 ? ' · game 2 of a doubleheader' : ''}`]];
+  if (g.series) game.push(['Series', `${esc(g.series)}${g.seriesResult ? ` · ${esc(g.seriesResult)}` : ''}`]);
+  game.push([`${esc(team)} starter`, starterLine(g.teamStarter)], [`${esc(opp)} starter`, starterLine(g.oppStarter)]);
+
+  const call = [];
+  if (g.synthetic) {
+    call.push(['The call', '<span class="pending">None. This game was before the bot started (backfilled).</span>']);
+  } else {
+    const pickPct = Math.round(pickConf(g) * 100);
+    call.push(['The call', `“${esc(confidencePhrase(g.winProbability))} a ${esc(team)} ${g.predicted === 'W' ? 'victory' : 'defeat'} (${pickPct}%)”`]);
+    call.push(['Result', !done ? '<span class="pending">Pending</span>'
+      : hit(g) ? `<span class="correct">✓ Correct</span>` : `<span class="wrong">✗ Wrong</span>`]);
+  }
+  const dl = items => `<dl class="detail-col">${items.map(([k, v]) => `<div><dt>${k}</dt><dd>${v}</dd></div>`).join('')}</dl>`;
+
+  const factors = FACTORS.filter(([k]) => (g.factors || {})[k]);
+  const bars = factors.length ? `<div class="factor-bars">
+      <div class="fb-title">What each factor said <span class="pending">(chance of a ${esc(team)} win)</span></div>
+      ${factors.map(([k, label]) => {
+        const v = g.factors[k], w = Math.abs(v - 0.5) * 100, up = v >= 0.5;
+        return `<div class="fb-row"><span class="fb-label">${k === 'stars' ? '⭐ ' : ''}${label}</span>
+          <span class="fb-track"><span class="fb-mid"></span><span class="fb-fill ${up ? 'up' : 'down'}" style="${up ? 'left' : 'right'}:50%;width:${w}%"></span></span>
+          <span class="fb-val num">${Math.round(v * 100)}%</span></div>`;
+      }).join('')}
+    </div>` : '';
+
+  const links = [g.postUrl && postLink(g.postUrl, 'Bluesky post ↗'),
+    g.gamePk && `<a class="post-link" href="https://www.mlb.com/gameday/${g.gamePk}" target="_blank" rel="noopener">MLB Gameday ↗</a>`].filter(Boolean);
+
+  return `<div class="detail">
+    ${dl(game)}
+    ${dl(call)}
+    ${bars}
+    ${links.length ? `<div class="detail-links">${links.join('')}</div>` : ''}
+  </div>`;
+}
+
 const gameLog = {
-  games: [], filtered: [], page: 1, active: 'all', opts: {},
+  games: [], filtered: [], page: 1, active: 'all', open: new Set(),
 
   html(title = 'Game Log') {
     return `<div class="game-log panel" style="margin-top:0">
       <h2>${title}</h2>
       <div class="filter-bar" id="filterBar"></div>
-      <div class="table-scroll"><table><thead id="logHead"></thead><tbody id="logBody"></tbody></table></div>
+      <div class="table-scroll"><table class="log">
+        <thead><tr><th>Date</th><th>Opponent</th><th>Predicted</th><th>Actual</th><th>Score</th><th class="chev-col" aria-label="Details"></th></tr></thead>
+        <tbody id="logBody"></tbody></table></div>
       <div class="pagination" id="pagination"></div>
     </div>`;
   },
 
-  mount(games, opts = {}) {
-    this.games = games; this.opts = opts; this.page = 1;
+  key: g => String(g.gamePk || `${g.date}|${g.opponent}|${g.gameNumber || ''}`),
+
+  mount(games) {
+    this.games = games; this.page = 1; this.open = new Set();
     const opponents = [...new Set(games.filter(g => g.actual).map(g => g.opponent))];
     const bar = document.getElementById('filterBar');
     bar.innerHTML = `<span class="chip active" data-filter="all">All</span>` +
       opponents.map(o => `<span class="chip" data-filter="${esc(o)}">${esc(shortTeam(o))}</span>`).join('');
     bar.querySelectorAll('.chip').forEach(c => c.onclick = () => this.filter(c.dataset.filter));
-    const cols = ['Date', ...(opts.series ? ['Series'] : []), ...(opts.team ? ['Team'] : []), 'Opponent', 'H/A', 'Predicted', 'Actual', 'Score', 'Win Prob', 'Result', ''];
-    document.getElementById('logHead').innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+    const body = document.getElementById('logBody');
+    body.onclick = e => { const tr = e.target.closest('tr.game'); if (tr && !e.target.closest('a')) this.toggle(tr.dataset.key); };
+    body.onkeydown = e => {
+      const tr = e.target.closest('tr.game');
+      if (tr && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); this.toggle(tr.dataset.key); }
+    };
     this.filter('all');
+  },
+
+  toggle(key) {
+    this.open.has(key) ? this.open.delete(key) : this.open.add(key);
+    this.render();
+    const row = document.querySelector(`#logBody tr.game[data-key="${CSS.escape(key)}"]`);
+    if (row) row.focus({ preventScroll: true });
   },
 
   filter(f) {
@@ -1064,27 +1242,22 @@ const gameLog = {
     this.page = Math.min(this.page, pages);
     const rows = this.filtered.slice((this.page - 1) * PAGE_SIZE, this.page * PAGE_SIZE);
     const m = isMobile();
+    const tag = v => v === 'W' ? 'tag-w' : v === 'L' ? 'tag-l' : 'tag-na';
 
     body.innerHTML = rows.length ? rows.map(g => {
-      const done = g.actual && !g.synthetic, ok = done && g.predicted === g.actual;
-      const resultClass = g.synthetic ? 'pending' : !done ? 'pending' : ok ? 'correct' : 'wrong';
-      const resultText = g.synthetic ? 'backfill' : !done ? 'Pending' : ok ? '✓ Correct' : '✗ Wrong';
-      const tag = v => v === 'W' ? 'tag-w' : v === 'L' ? 'tag-l' : 'tag-na';
-      const score = (g.teamScore || g.oppScore) ? `${g.teamScore}-${g.oppScore}` : '—';
-      return `<tr>
+      const key = this.key(g), open = this.open.has(key);
+      const done = g.actual && !g.synthetic;
+      const mark = !done ? '' : hit(g) ? ' <span class="correct" title="Correct">✓</span>' : ' <span class="wrong" title="Wrong">✗</span>';
+      const score = g.actual ? `${g.teamScore}-${g.oppScore}` : '—';
+      return `<tr class="game${open ? ' open' : ''}" data-key="${esc(key)}" tabindex="0" role="button" aria-expanded="${open}">
         <td>${esc(m ? g.date.slice(5) : g.date)}</td>
-        ${this.opts.series ? `<td title="${esc(g.seriesResult)}">${esc(m ? String(g.series || '—').replace(' Game ', ' G') : (g.series || '—'))}</td>` : ''}
-        ${this.opts.team ? `<td>${esc(teamName(g.team))}</td>` : ''}
-        <td>${esc(teamName(g.opponent))}</td>
-        <td>${m ? (g.isHome ? 'H' : 'A') : (g.isHome ? 'Home' : 'Away')}</td>
-        <td><span class="tag ${g.synthetic ? 'tag-na' : tag(g.predicted)}">${g.synthetic ? '—' : esc(g.predicted)}</span></td>
+        <td>${g.isHome ? '' : '<span class="pending">@ </span>'}${esc(teamName(g.opponent))}</td>
+        <td><span class="tag ${g.synthetic ? 'tag-na' : tag(g.predicted)}">${g.synthetic ? '—' : esc(g.predicted)}</span>${mark}</td>
         <td><span class="tag ${tag(g.actual)}">${esc(g.actual || '—')}</span></td>
         <td class="num">${score}</td>
-        <td class="num">${g.synthetic ? '—' : Math.round(g.winProbability * 100) + '%'}</td>
-        <td class="${resultClass}">${resultText}</td>
-        <td>${postLink(g.postUrl, '🔗')}</td>
-      </tr>`;
-    }).join('') : `<tr><td colspan="12" class="pending" style="text-align:center;padding:24px">No games yet.</td></tr>`;
+        <td class="chev-col"><span class="chev">›</span></td>
+      </tr>${open ? `<tr class="detail-row"><td colspan="6">${gameDetail(g)}</td></tr>` : ''}`;
+    }).join('') : `<tr><td colspan="6" class="pending" style="text-align:center;padding:24px">No games yet.</td></tr>`;
 
     const pag = document.getElementById('pagination');
     if (pages <= 1) { pag.innerHTML = ''; return; }
@@ -1105,10 +1278,10 @@ function analysisHTML(prefix, { calendar, games, weights, baseline, team }) {
   }
   return `${calendar ? `<div class="grid">${panel('🗓️ The Season, Game by Game', seasonCalendar(games), { wide: true })}</div>` : ''}
   <div class="grid">
-    ${panel('', canvas(prefix + 'Race', 260), { wide: true, id: prefix + 'RaceTitle' })}
+    ${panel(baseline === 'pessimist' ? '😩 The Bot vs. The Pessimist' : '🪙 The Bot vs. A Coin Flip', baselinePanel(prefix, completedOf(games), baseline, team), { wide: true })}
     ${panel('🔬 Stars vs. Science', starsVsSciencePanel(prefix + 'Stars', completedOf(games), team))}
     ${panel('📣 Confidence Is Decorative', confidencePanel(prefix + 'Conf', completedOf(games)).html)}
-    ${weights ? panel('', canvas(prefix + 'Drift', 240) + `<p class="caption" id="${prefix}DriftCap"></p>`, { id: prefix + 'DriftTitle' }) : ''}
+    ${weights ? panel('', canvas(prefix + 'Drift', 260), { id: prefix + 'DriftTitle' }) : ''}
     ${weights ? panel(weights.title, canvas(prefix + 'Pie', 260)) : ''}
     ${panel('Record by Opponent', canvas(prefix + 'Opp'), { wide: true })}
   </div>`;
@@ -1116,8 +1289,8 @@ function analysisHTML(prefix, { calendar, games, weights, baseline, team }) {
 function drawAnalysis(prefix, { games, weights, baseline, team }) {
   const done = completedOf(games);
   if (!done.length) return;
-  renderRaceChart(prefix + 'Race', prefix + 'RaceTitle', done, baseline);
-  drawStarsBuckets(prefix + 'Stars', done, team);
+  drawBaselineChart(prefix + 'Race', done, baseline);
+  drawStarsChart(prefix + 'Stars', done, team);
   drawConfidence(prefix + 'Conf', confidencePanel(prefix + 'Conf', done).groups);
   if (weights) {
     drawTrustDrift(prefix + 'Drift', prefix + 'DriftTitle', done);
@@ -1143,7 +1316,7 @@ function renderRegular(main, d) {
     { value: `${wins}-${losses}`, label: 'Rockies Record' },
     { value: signed(vsPessimist), label: vsPessimist < 0 ? 'Games behind “always pick L”' : 'Games ahead of “always pick L”' },
   ]) + highlightsPanel(games, { title: finished ? `📜 ${d.season} Report Card` : '🌠 Cosmic Highlights (so far)', summary: d.summary })
-    + analysisHTML('reg', { calendar: true, games, weights, team: 'Rockies' })
+    + analysisHTML('reg', { calendar: true, games, weights, baseline: 'pessimist', team: 'Rockies' })
     + gameLog.html();
   drawAnalysis('reg', { games, weights, baseline: 'pessimist', team: 'Rockies' });
   gameLog.mount(games);
@@ -1190,7 +1363,7 @@ function renderPostseason(main, d) {
       ${ps.audits.length ? panel('🔭 Playoff Birth-Chart Audit', canvas('psAudit', Math.max(160, ps.audits.length * 34), { keep: true }), { wide: true }) : ''}
     </div>`
     + highlightsPanel(games, { title: '🌠 October Highlights', baseline: 'coin', team: 'adopted team' })
-    + analysisHTML('ps', { games, team: 'adopted team' })
+    + analysisHTML('ps', { games, baseline: 'coin', team: 'adopted team' })
     + gameLog.html('Adopted Team Game Log');
 
   if (ps.audits.length) {
@@ -1222,7 +1395,7 @@ function renderPostseason(main, d) {
     });
   }
   drawAnalysis('ps', { games, baseline: 'coin', team: 'adopted team' });
-  gameLog.mount(games, { series: true, team: true });
+  gameLog.mount(games);
 }
 
 function renderSpring(main, d) {
@@ -1240,7 +1413,7 @@ function renderSpring(main, d) {
     { value: win.value, label: win.label },
   ]) + `<p class="note">🌵 Spring games don't count. Neither do these picks. They never touch the regular-season model.</p>`
     + highlightsPanel(games, { title: '🌠 Spring Highlights', baseline: 'coin' })
-    + analysisHTML('sp', { calendar: true, games, team: 'Rockies' })
+    + analysisHTML('sp', { calendar: true, games, baseline: 'coin', team: 'Rockies' })
     + gameLog.html('Spring Game Log');
   drawAnalysis('sp', { games, baseline: 'coin', team: 'Rockies' });
   gameLog.mount(games);
@@ -1371,6 +1544,8 @@ async function init() {
     return;
   }
   renderBanner(app.status);
+  document.getElementById('seasonSelect').onchange = e => go(e.target.value === 'all' ? 'all' : +e.target.value);
+  document.getElementById('viewSelect').onchange = e => go(app.season, e.target.value);
   window.addEventListener('hashchange', route);
   route();
 }

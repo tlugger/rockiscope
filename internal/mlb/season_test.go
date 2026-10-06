@@ -150,3 +150,24 @@ func TestSeasonEndpoints_PropagateErrors(t *testing.T) {
 		t.Error("expected error")
 	}
 }
+
+func TestGetSeasonResultsFor_IncludesStarters(t *testing.T) {
+	c := fixtureClient(t, map[string]string{"/schedule": "results_starters.json"})
+	results, err := c.GetSeasonResultsFor(2026)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(results) == 0 {
+		t.Fatal("no results")
+	}
+	opener := results[0]
+	if opener.GamePk != 823893 || opener.IsHome {
+		t.Fatalf("opener = %+v", opener)
+	}
+	if opener.RockiesStarter == nil || opener.RockiesStarter.FullName != "Kyle Freeland" {
+		t.Errorf("Rockies starter = %+v", opener.RockiesStarter)
+	}
+	if opener.OppStarter == nil || opener.OppStarter.FullName != "Sandy Alcantara" {
+		t.Errorf("opponent starter = %+v", opener.OppStarter)
+	}
+}

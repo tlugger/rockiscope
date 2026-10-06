@@ -9,13 +9,14 @@ import (
 
 // ReconcileResult counts what Reconcile changed.
 type ReconcileResult struct {
-	Created       int // synthetic records added for games with no record
-	ScoresFilled  int
-	ActualsFilled int
+	Created        int // synthetic records added for games with no record
+	ScoresFilled   int
+	ActualsFilled  int
+	StartersFilled int // starter names backfilled from MLB's schedule
 }
 
 func (r ReconcileResult) Changed() bool {
-	return r.Created+r.ScoresFilled+r.ActualsFilled > 0
+	return r.Created+r.ScoresFilled+r.ActualsFilled+r.StartersFilled > 0
 }
 
 // Reconcile brings the history in line with MLB's completed games: every final
@@ -61,6 +62,8 @@ func Reconcile(h *PredictionHistory, results []mlb.GameResult, protectFrom strin
 				GameNumber:     gr.GameNumber,
 				WinProbability: 0.5,
 				Synthetic:      true,
+				RockiesStarter: NewStarter(gr.RockiesStarter, nil),
+				OppStarter:     NewStarter(gr.OppStarter, nil),
 			})
 			if gr.GamePk != 0 {
 				byGamePk[gr.GamePk] = len(h.Predictions) - 1
@@ -70,6 +73,14 @@ func Reconcile(h *PredictionHistory, results []mlb.GameResult, protectFrom strin
 		}
 
 		existing := &h.Predictions[i]
+		if existing.RockiesStarter == nil && gr.RockiesStarter != nil {
+			existing.RockiesStarter = NewStarter(gr.RockiesStarter, nil)
+			res.StartersFilled++
+		}
+		if existing.OppStarter == nil && gr.OppStarter != nil {
+			existing.OppStarter = NewStarter(gr.OppStarter, nil)
+			res.StartersFilled++
+		}
 		if existing.GamePK == 0 {
 			existing.GamePK = gr.GamePk
 		}
@@ -134,6 +145,12 @@ func (h *PredictionHistory) Merge(other *PredictionHistory) int {
 			if merged.RockiesScore == 0 && merged.OppScore == 0 {
 				merged.RockiesScore, merged.OppScore = p.RockiesScore, p.OppScore
 			}
+			if merged.RockiesStarter == nil {
+				merged.RockiesStarter = p.RockiesStarter
+			}
+			if merged.OppStarter == nil {
+				merged.OppStarter = p.OppStarter
+			}
 			*p = merged
 		} else {
 			if p.Actual == "" {
@@ -153,6 +170,12 @@ func (h *PredictionHistory) Merge(other *PredictionHistory) int {
 			}
 			if p.Factors == (FactorScores{}) {
 				p.Factors = o.Factors
+			}
+			if p.RockiesStarter == nil {
+				p.RockiesStarter = o.RockiesStarter
+			}
+			if p.OppStarter == nil {
+				p.OppStarter = o.OppStarter
 			}
 		}
 		if *p != before {

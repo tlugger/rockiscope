@@ -52,6 +52,7 @@ func (s *Scheduler) springTask(season int, r *tickResult) {
 				TeamID: mlb.RockiesID, TeamName: "Colorado Rockies", Opponent: g.Opponent().Name, IsHome: g.IsHome,
 				Pick: post.Prediction.Pick, WinProbability: post.Prediction.WinProbability,
 				Factors: post.Prediction.FactorScores(),
+				TeamStarter: post.TeamStarter, OppStarter: post.OppStarter,
 				PostURI: uri, FirstPitch: g.GameDateTime,
 			})
 			s.saveSeasonState()
@@ -92,7 +93,7 @@ func (s *Scheduler) buildSpringPost(g *mlb.Game) formatter.Post {
 		HoroscopeText:   horoText,
 	}, weights)
 
-	return formatter.FormatSpringGame(formatter.SpringGame{
+	post := formatter.FormatSpringGame(formatter.SpringGame{
 		Opponent:      g.Opponent().Name,
 		IsHome:        g.IsHome,
 		GameTime:      g.FormatGameTime(),
@@ -101,6 +102,9 @@ func (s *Scheduler) buildSpringPost(g *mlb.Game) formatter.Post {
 		Prediction:    pred,
 		HoroscopeText: horoText,
 	})
+	post.TeamStarter = prediction.NewStarter(g.RockiesPitcher(), ourStats)
+	post.OppStarter = prediction.NewStarter(g.OpponentPitcher(), theirStats)
+	return post
 }
 
 func (s *Scheduler) settleSpringPicks(season int, r *tickResult) {

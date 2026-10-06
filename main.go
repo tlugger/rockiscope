@@ -204,7 +204,7 @@ func cmdBackfill(logger *log.Logger) {
 	if err := prediction.SaveHistory(hist, dataDir); err != nil {
 		logger.Fatalf("saving history: %v", err)
 	}
-	logger.Printf("backfill complete: %d synthetic created, %d scores filled, %d actuals filled", res.Created, res.ScoresFilled, res.ActualsFilled)
+	logger.Printf("backfill complete: %d synthetic created, %d scores filled, %d actuals filled, %d starters filled", res.Created, res.ScoresFilled, res.ActualsFilled, res.StartersFilled)
 	logger.Println("the running bot merges these changes on its next wake; no restart needed")
 }
 

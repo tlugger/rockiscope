@@ -90,3 +90,41 @@ func TestMerge_RealPredictionBeatsSynthetic(t *testing.T) {
 		t.Errorf("merged = %+v", p)
 	}
 }
+
+func TestReconcile_BackfillsStarterNamesOnly(t *testing.T) {
+	withStats := &Starter{ID: 1, Name: "Kyle Freeland", ERA: 3.21, WHIP: 1.3, HasStats: true}
+	h := &PredictionHistory{Predictions: []PredictionRecord{
+		{Date: "2026-04-08", Opponent: "Houston Astros", GamePK: 3, Predicted: "L", Actual: "L", RockiesStarter: withStats},
+	}}
+	rs := []mlb.GameResult{
+		{GamePk: 3, Date: "2026-04-08", Opponent: "Houston Astros", RockiesStarter: &mlb.PitcherInfo{ID: 9, FullName: "Someone Else"}, OppStarter: &mlb.PitcherInfo{ID: 2, FullName: "Framber Valdez"}},
+		{GamePk: 1, Date: "2026-03-27", Opponent: "Miami Marlins", Won: false, RockiesStarter: &mlb.PitcherInfo{ID: 1, FullName: "Kyle Freeland"}},
+	}
+	res := Reconcile(h, rs, "")
+	if res.StartersFilled != 1 || res.Created != 1 {
+		t.Fatalf("result = %+v", res)
+	}
+	byPk := map[int]PredictionRecord{}
+	for _, p := range h.Predictions {
+		byPk[p.GamePK] = p
+	}
+	if p := byPk[3]; p.RockiesStarter != withStats || p.OppStarter == nil || p.OppStarter.Name != "Framber Valdez" || p.OppStarter.HasStats {
+		t.Errorf("existing record: %+v / %+v", p.RockiesStarter, p.OppStarter)
+	}
+	if p := byPk[1]; p.RockiesStarter == nil || p.RockiesStarter.Name != "Kyle Freeland" || p.RockiesStarter.HasStats {
+		t.Errorf("synthetic record starter: %+v", p.RockiesStarter)
+	}
+}
+
+func TestNewStarter(t *testing.T) {
+	if NewStarter(nil, nil) != nil {
+		t.Error("no pitcher should mean no starter")
+	}
+	s := NewStarter(&mlb.PitcherInfo{ID: 5, FullName: "A"}, &mlb.PitcherStats{ERA: 4.5, WHIP: 1.2, InningsPitched: 30})
+	if !s.HasStats || s.ERA != 4.5 {
+		t.Errorf("starter = %+v", s)
+	}
+	if noIP := NewStarter(&mlb.PitcherInfo{ID: 5, FullName: "A"}, &mlb.PitcherStats{}); noIP.HasStats {
+		t.Error("zero innings shouldn't count as stats")
+	}
+}

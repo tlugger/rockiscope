@@ -280,6 +280,7 @@ func (s *Scheduler) predictAdoptedGames(season int, a adoption, b bracket, r *ti
 				TeamID: team.ID, TeamName: team.Name, Opponent: opp.Name, IsHome: isHome,
 				Pick: post.Prediction.Pick, WinProbability: post.Prediction.WinProbability,
 				Factors: post.Prediction.FactorScores(), Series: g.SeriesShort,
+				TeamStarter: post.TeamStarter, OppStarter: post.OppStarter,
 				PostURI: uri, FirstPitch: g.GameDateTime,
 			})
 			s.saveSeasonState()
@@ -317,7 +318,7 @@ func (s *Scheduler) buildAdoptedGamePost(season int, a adoption, g mlb.Postseaso
 		HoroscopeText:   horoText,
 	}, weights)
 
-	return formatter.FormatAdoptedGame(formatter.AdoptedGame{
+	post := formatter.FormatAdoptedGame(formatter.AdoptedGame{
 		TeamName:      team.Name,
 		Opponent:      opp.Name,
 		IsHome:        isHome,
@@ -329,6 +330,9 @@ func (s *Scheduler) buildAdoptedGamePost(season int, a adoption, g mlb.Postseaso
 		Prediction:    pred,
 		HoroscopeText: horoText,
 	})
+	post.TeamStarter = prediction.NewStarter(team.ProbablePitcher, ourStats)
+	post.OppStarter = prediction.NewStarter(opp.ProbablePitcher, theirStats)
+	return post
 }
 
 // settlePostseasonPicks replies to each prediction once its game is final.

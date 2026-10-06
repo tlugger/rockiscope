@@ -42,8 +42,10 @@ type Pick struct {
 	PostURI        string                  `json:"postUri,omitempty"`
 	Result         string                  `json:"result,omitempty"` // "W"/"L" once final, "void" if never played
 	Score          string                  `json:"score,omitempty"`  // "5-3"
-	TeamScore      int                     `json:"teamScore,omitempty"`
-	OppScore       int                     `json:"oppScore,omitempty"`
+	TeamScore      int                     `json:"teamScore"`
+	OppScore       int                     `json:"oppScore"`
+	TeamStarter    *prediction.Starter     `json:"teamStarter,omitempty"`
+	OppStarter     *prediction.Starter     `json:"oppStarter,omitempty"`
 	FirstPitch     time.Time               `json:"firstPitch"`
 }
 

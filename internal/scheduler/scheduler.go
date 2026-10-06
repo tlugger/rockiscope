@@ -489,7 +489,7 @@ func (s *Scheduler) handleGameDay(game *mlb.Game, today string) error {
 	post := s.buildGameDayPost(game)
 	img := s.generateImage(post.HoroscopeText)
 
-	s.recordPrediction(today, game, post.Prediction, "")
+	s.recordPrediction(today, game, post, "")
 
 	postRef, err := s.poster.Post(post.Text, img)
 	if err != nil {
@@ -592,16 +592,17 @@ func (s *Scheduler) buildGameDayPost(game *mlb.Game) formatter.Post {
 		weights = s.predHistory.Current
 	}
 
+	oppStats := s.getOpponentPitcher(game)
 	pred := prediction.Predict(prediction.Input{
 		Record:          record,
 		RockiesPitcher:  pitcherStats,
-		OpponentPitcher: s.getOpponentPitcher(game),
+		OpponentPitcher: oppStats,
 		HeadToHead:      h2h,
 		IsHome:          game.IsHome,
 		HoroscopeText:   horoText,
 	}, weights)
 
-	return formatter.FormatGameDay(formatter.GameDayPost{
+	post := formatter.FormatGameDay(formatter.GameDayPost{
 		Game:       game,
 		Record:     record,
 		H2H:        h2h,
@@ -609,6 +610,9 @@ func (s *Scheduler) buildGameDayPost(game *mlb.Game) formatter.Post {
 		Horoscope:  horo,
 		Prediction: pred,
 	})
+	post.TeamStarter = prediction.NewStarter(game.RockiesPitcher(), pitcherStats)
+	post.OppStarter = prediction.NewStarter(game.OpponentPitcher(), oppStats)
+	return post
 }
 
 func (s *Scheduler) buildOffDayPost() formatter.Post {
@@ -655,7 +659,8 @@ func (s *Scheduler) publish(post formatter.Post) error {
 	return nil
 }
 
-func (s *Scheduler) recordPrediction(date string, game *mlb.Game, pred prediction.Prediction, postURI string) {
+func (s *Scheduler) recordPrediction(date string, game *mlb.Game, post formatter.Post, postURI string) {
+	pred := post.Prediction
 	factors := pred.FactorScores()
 	// Prefer MLB's official date over the wall-clock date: it is stable across
 	// time zones and correctly dates double-header game 2 and postponed makeups.
@@ -675,6 +680,8 @@ func (s *Scheduler) recordPrediction(date string, game *mlb.Game, pred predictio
 		GameNumber:      game.GameNumber,
 		WinProbability: pred.WinProbability,
 		Factors:       factors,
+		RockiesStarter: post.TeamStarter,
+		OppStarter:     post.OppStarter,
 	}
 
 	if s.predHistory == nil {
