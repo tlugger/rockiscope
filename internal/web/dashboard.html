@@ -308,6 +308,30 @@
   tr.clickable { cursor: pointer; }
   .num { font-variant-numeric: tabular-nums; }
 
+
+  /* ── analysis ── */
+  .caption { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin-top: 10px; }
+  .caption b { color: var(--text); }
+  .versus { display: flex; align-items: center; justify-content: center; gap: 24px; text-align: center; margin: 4px 0 6px; }
+  .versus .big { font-size: 40px; font-weight: 700; color: var(--accent); line-height: 1; }
+  .versus .label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .versus .vs { color: var(--text-dim); font-size: 14px; font-style: italic; }
+  .calendar { display: flex; flex-direction: column; gap: 6px; }
+  .cal-row { display: flex; gap: 10px; align-items: flex-start; }
+  .cal-month { width: 34px; flex-shrink: 0; color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding-top: 3px; }
+  .cal-cells { display: flex; flex-wrap: wrap; gap: 3px; }
+  .cal-cells a { text-decoration: none; }
+  .calendar span, .cal-legend span {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 4px; font-size: 10px; font-weight: 700; color: #fff;
+  }
+  .cal-hit { background: #2FA3BC; }
+  .cal-miss { background: #D9587D; }
+  .cal-syn { background: rgba(230,220,255,0.18); color: var(--text-dim) !important; }
+  .calendar span:hover { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .cal-legend { color: var(--text-dim); font-size: 12px; margin-top: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .cal-legend span { width: 16px; height: 16px; font-size: 9px; margin-left: 6px; }
+
   @media (max-width: 768px) {
     .banner { padding: 12px; gap: 10px; }
     .banner .side { text-align: left; }
@@ -623,175 +647,290 @@ function renderBanner(s) {
 // ── shared chart components ──────────────────────────────────────────
 
 const completedOf = games => games.filter(g => g.actual && !g.synthetic);
+const hit = g => g.predicted === g.actual;
+const pickConf = g => g.predicted === 'W' ? g.winProbability : 1 - g.winProbability;
+const signed = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);
 
-function renderAccuracyChart(id, completed) {
-  const labels = [], cum = [], rolling = [];
-  let correct = 0;
+// Factor colors for the weights pie, ordered so neighboring slices (including
+// the wrap-around) pass the CVD check. Slices are also direct-labeled.
+const FACTOR_COLORS = {
+  winRate: '#2FA3BC', pitcher: '#D9587D', h2h: '#B5862A',
+  homeAway: '#5A8BE8', momentum: '#C7792E', stars: '#9C7BE6',
+};
+
+// The engine's confidence phrases, as they appear in posts.
+const CONFIDENCE = [
+  ['coin', 'A cosmic coin flip'],
+  ['nudge', 'A slight celestial nudge'],
+  ['lean', 'The stars lean toward'],
+  ['strong', 'The cosmos strongly favor'],
+  ['scream', 'The stars are screaming'],
+];
+
+// Bot vs a baseline, game by game. Regular season: "always pick L" (the
+// pessimist). Postseason/spring: a coin flip.
+function renderRaceChart(id, titleId, completed, baseline) {
+  const labels = [], lead = [];
+  let bot = 0, base = 0;
   completed.forEach((g, i) => {
-    if (g.predicted === g.actual) correct++;
+    bot += hit(g) ? 1 : 0;
+    base += baseline === 'pessimist' ? (g.actual === 'L' ? 1 : 0) : 0.5;
     labels.push(g.date.slice(5));
-    cum.push(+((correct / (i + 1)) * 100).toFixed(1));
-    const win = completed.slice(Math.max(0, i - 9), i + 1);
-    rolling.push(+((win.filter(w => w.predicted === w.actual).length / win.length) * 100).toFixed(1));
+    lead.push(+(bot - base).toFixed(1));
   });
-  const hit = g => g.predicted === g.actual;
+  const final = lead.length ? lead[lead.length - 1] : 0;
+  const rival = baseline === 'pessimist' ? 'the Pessimist' : 'a Coin Flip';
+  const title = document.getElementById(titleId);
+  if (title) {
+    title.textContent = `The Bot vs. ${rival} · ` + (!lead.length ? 'no games yet'
+      : final > 0 ? `bot leads by ${final}` : final < 0 ? `${baseline === 'pessimist' ? 'pessimist' : 'coin'} leads by ${-final}` : 'dead even');
+  }
 
   chart(id, {
     type: 'line',
     data: {
       labels,
-      datasets: [
-        {
-          label: 'Cumulative %', data: cum, borderColor: COLORS.primary, backgroundColor: alpha(COLORS.primary, 0.15),
-          borderWidth: 2, fill: true, tension: 0.3, pointRadius: 4, pointHoverRadius: 7,
-          pointStyle: completed.map(g => hit(g) ? 'circle' : 'crossRot'),
-          pointBackgroundColor: completed.map(g => hit(g) ? COLORS.good : COLORS.bad),
-          pointBorderColor: completed.map(g => hit(g) ? COLORS.good : COLORS.bad),
-        },
-        { label: 'Rolling 10-game %', data: rolling, borderColor: COLORS.secondary, borderWidth: 2, borderDash: [5, 3], tension: 0.3, pointRadius: 0, fill: false },
-        { label: '50% coin flip', data: cum.map(() => 50), borderColor: COLORS.neutral, borderWidth: 1, borderDash: [2, 4], pointRadius: 0, fill: false },
-      ]
+      datasets: [{
+        label: baseline === 'pessimist' ? 'Games ahead of "always pick L"' : 'Games ahead of a coin flip',
+        data: lead, borderColor: COLORS.primary, borderWidth: 2, tension: 0.25,
+        pointRadius: completed.length > 60 ? 0 : 3, pointHoverRadius: 6,
+        fill: { target: 'origin', above: alpha(COLORS.good, 0.25), below: alpha(COLORS.bad, 0.25) },
+      }]
     },
     options: {
       ...CHART_DEFAULTS,
       interaction: { mode: 'index', intersect: false },
-      onClick: (e, els) => { if (els.length) gameLog.filter(completed[els[0].index].opponent); },
       plugins: {
         ...CHART_DEFAULTS.plugins,
-        legend: { labels: { color: COLORS.textDim, font: { size: 11 }, usePointStyle: true, pointStyle: 'line',
-          generateLabels: c => Chart.defaults.plugins.legend.labels.generateLabels(c).map(l => {
-            const ds = c.data.datasets[l.datasetIndex];
-            return { ...l, strokeStyle: ds.borderColor, fillStyle: ds.borderColor, pointStyle: 'line', lineWidth: 2 };
-          }) } },
-        tooltip: {
-          ...CHART_DEFAULTS.plugins.tooltip,
-          callbacks: {
-            afterTitle: items => {
-              const g = completed[items[0].dataIndex];
-              return `${g.opponent}: ${hit(g) ? '✓ Correct' : '✗ Wrong'}`;
-            }
-          }
-        }
-      },
-      scales: { ...CHART_DEFAULTS.scales, y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } }
-    }
-  });
-}
-
-function renderHoroscopeChart(id, titleId, completed, team) {
-  const scored = completed.filter(g => g.factors && g.factors.stars && (g.teamScore > 0 || g.oppScore > 0));
-  const wins = [], losses = [], xs = [], ys = [];
-  scored.forEach(g => {
-    const point = { x: g.factors.stars * 100, y: g.teamScore - g.oppScore, g };
-    xs.push(point.x); ys.push(point.y);
-    (g.actual === 'W' ? wins : losses).push(point);
-  });
-  const n = xs.length;
-  let r = null;
-  if (n >= 2) {
-    const mx = xs.reduce((a, b) => a + b, 0) / n, my = ys.reduce((a, b) => a + b, 0) / n;
-    let num = 0, dx2 = 0, dy2 = 0;
-    for (let i = 0; i < n; i++) { const dx = xs[i] - mx, dy = ys[i] - my; num += dx * dy; dx2 += dx * dx; dy2 += dy * dy; }
-    if (dx2 && dy2) r = num / Math.sqrt(dx2 * dy2);
-  }
-  const title = document.getElementById(titleId);
-  if (title) title.textContent = `Horoscope vs Run Margin · cosmic r=${r === null ? '—' : r.toFixed(2)}`;
-
-  chart(id, {
-    type: 'scatter',
-    data: {
-      datasets: [
-        { label: 'Win', data: wins, backgroundColor: alpha(COLORS.good, 0.75), borderColor: COLORS.good, pointRadius: 5, pointHoverRadius: 8 },
-        { label: 'Loss', data: losses, backgroundColor: alpha(COLORS.bad, 0.75), borderColor: COLORS.bad, borderWidth: 2, pointStyle: 'crossRot', pointRadius: 6, pointHoverRadius: 9 },
-      ]
-    },
-    options: {
-      ...CHART_DEFAULTS,
-      plugins: {
-        ...CHART_DEFAULTS.plugins,
-        tooltip: {
-          ...CHART_DEFAULTS.plugins.tooltip,
-          callbacks: {
-            label: item => {
-              const g = item.raw.g, m = g.teamScore - g.oppScore;
-              return `${g.date} vs ${g.opponent}: stars ${item.raw.x.toFixed(0)}%, ${g.teamScore}-${g.oppScore} (${m > 0 ? '+' : ''}${m})`;
-            }
-          }
-        },
-        subtitle: scored.length ? { display: false } : {
-          display: true, text: 'No finished games with horoscope + score data yet',
-          color: COLORS.textDim, font: { size: 12, style: 'italic' }, padding: { top: 20 }
-        }
+        legend: { display: false },
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: {
+          title: items => { const g = completed[items[0].dataIndex]; return `${g.date} vs ${g.opponent}`; },
+          label: item => { const g = completed[item.dataIndex], v = item.raw;
+            return [`Bot ${hit(g) ? '✓ right' : '✗ wrong'} (said ${g.predicted}, got ${g.actual})`,
+              v > 0 ? `Bot ahead by ${v}` : v < 0 ? `Bot behind by ${-v}` : 'Dead even']; } } }
       },
       scales: {
-        x: { ...CHART_DEFAULTS.scales.x, min: 0, max: 100,
-          title: { display: true, text: `Stars favor ${team} →`, color: COLORS.textDim, font: { size: 11 } },
-          ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' } },
+        x: { ...CHART_DEFAULTS.scales.x, ticks: { ...CHART_DEFAULTS.scales.x.ticks, maxTicksLimit: 12 } },
         y: { ...CHART_DEFAULTS.scales.y,
-          title: { display: true, text: `Run margin (${team} − Opp)`, color: COLORS.textDim, font: { size: 11 } },
+          title: { display: true, text: '← behind · games · ahead →', color: COLORS.textDim, font: { size: 11 } },
           grid: { ...CHART_DEFAULTS.scales.y.grid,
-            color: ctx => ctx.tick.value === 0 ? 'rgba(200,170,255,0.35)' : COLORS.grid,
+            color: ctx => ctx.tick.value === 0 ? 'rgba(200,170,255,0.45)' : COLORS.grid,
             lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1 } }
       }
     }
   });
 }
 
-function renderFactorChart(id, completed) {
-  const correct = {}, total = {};
-  FACTORS.forEach(([f]) => { correct[f] = 0; total[f] = 0; });
+// When the horoscope and the stats disagreed, who was right? Plus how the
+// team did by horoscope mood.
+function starsVsScience(completed) {
+  let stars = 0, science = 0;
+  const buckets = { doom: [0, 0], meh: [0, 0], glowing: [0, 0] };
   completed.forEach(g => {
+    const f = g.factors || {};
+    if (!f.stars) return;
     const won = g.actual === 'W';
-    FACTORS.forEach(([f]) => {
-      const v = (g.factors || {})[f];
-      if (v) { total[f]++; if ((v > 0.5) === won) correct[f]++; }
-    });
+    const b = f.stars < 0.33 ? 'doom' : f.stars > 0.66 ? 'glowing' : 'meh';
+    buckets[b][won ? 0 : 1]++;
+    const others = FACTORS.map(([k]) => f[k]).filter((v, i) => FACTORS[i][0] !== 'stars' && v);
+    if (!others.length) return;
+    const sci = others.reduce((a, v) => a + v, 0) / others.length;
+    if ((f.stars > 0.5) !== (sci > 0.5)) (f.stars > 0.5) === won ? stars++ : science++;
   });
+  return { stars, science, buckets };
+}
+
+function starsVsSciencePanel(id, completed, team) {
+  const { stars, science, buckets } = starsVsScience(completed);
+  const [gw, gl] = buckets.glowing, [dw, dl] = buckets.doom;
+  let quip = 'Not enough disagreements to settle it yet.';
+  if (stars + science >= 5) {
+    quip = science > stars ? 'Science wins. The stars have been notified.' : stars > science ? 'The stars win. Science is in shambles.' : 'A dead heat. The universe shrugs.';
+  }
+  let mood = '';
+  if (gw + gl && dw + dl) {
+    const gp = gw / (gw + gl), dp = dw / (dw + dl);
+    mood = gp < dp ? `When the stars were glowing, the ${esc(team)} went <b>${gw}-${gl}</b>. Worse than when they said doom (${dw}-${dl}).`
+      : `When the stars were glowing, the ${esc(team)} went <b>${gw}-${gl}</b>. When they said doom, ${dw}-${dl}.`;
+  }
+  return `<div class="versus">
+      <div><div class="big num">${science}</div><div class="label">🔬 Science</div></div>
+      <div class="vs">vs</div>
+      <div><div class="big num">${stars}</div><div class="label">🔮 Stars</div></div>
+    </div>
+    <p class="caption">Games where the horoscope disagreed with the stats, and who called it. ${quip}</p>
+    ${canvas(id, 170)}
+    ${mood ? `<p class="caption">${mood}</p>` : ''}`;
+}
+
+function drawStarsBuckets(id, completed, team) {
+  const { buckets } = starsVsScience(completed);
+  const keys = [['doom', '🌑 Doom (<33%)'], ['meh', '🌗 Meh'], ['glowing', '🌕 Glowing (>66%)']];
   chart(id, {
     type: 'bar',
     data: {
-      labels: FACTORS.map(([, l]) => l),
-      datasets: [{
-        label: 'Accuracy %',
-        data: FACTORS.map(([f]) => total[f] ? +((correct[f] / total[f]) * 100).toFixed(1) : null),
-        backgroundColor: alpha(COLORS.primary, 0.75), borderColor: COLORS.primary, borderWidth: 1, borderRadius: 4, barThickness: 14,
-      }]
+      labels: keys.map(([, l]) => l),
+      datasets: [{ label: `${team} win %`,
+        data: keys.map(([k]) => { const [w, l] = buckets[k]; return w + l ? +((w / (w + l)) * 100).toFixed(1) : null; }),
+        backgroundColor: alpha(COLORS.primary, 0.8), borderRadius: 4, maxBarThickness: 48 }]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false },
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: {
+          label: i => { const [w, l] = buckets[keys[i.dataIndex][0]]; return `${team} ${w}-${l} (${i.raw}%)`; } } } },
+      scales: { x: { ...CHART_DEFAULTS.scales.x, grid: { display: false } },
+        y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100, title: { display: true, text: `${team} win %`, color: COLORS.textDim, font: { size: 11 } },
+          ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } }
+    }
+  });
+}
+
+function confidencePanel(id, completed) {
+  // Same thresholds as prediction.confidenceLabel (strictly greater than).
+  const bucket = g => { const d = Math.abs(g.winProbability - 0.5);
+    return d > 0.30 ? 'scream' : d > 0.20 ? 'strong' : d > 0.10 ? 'lean' : d > 0.05 ? 'nudge' : 'coin'; };
+  const groups = CONFIDENCE.map(([k, label]) => {
+    const gs = completed.filter(g => bucket(g) === k);
+    return { k, label, n: gs.length, right: gs.filter(hit).length };
+  });
+  const never = groups.filter(g => !g.n).map(g => `“${g.label}”`);
+  const maxConf = completed.length ? Math.round(Math.max(...completed.map(pickConf)) * 100) : 0;
+  const caption = completed.length
+    ? `Its boldest pick was ${maxConf}%.` + (never.length ? ` It never once said ${never.join(' or ')}.` : '')
+    : '';
+  return { html: `${canvas(id, 220)}<p class="caption">${caption}</p>`, groups };
+}
+
+function drawConfidence(id, groups) {
+  chart(id, {
+    type: 'bar',
+    data: {
+      labels: groups.map(g => g.n ? `${g.label} (${g.n})` : `${g.label} (never)`),
+      datasets: [{ label: 'Accuracy', data: groups.map(g => g.n ? +((g.right / g.n) * 100).toFixed(1) : null),
+        backgroundColor: alpha(COLORS.primary, 0.8), borderRadius: 4, barThickness: 14 }]
     },
     options: {
       ...CHART_DEFAULTS,
       indexAxis: 'y',
       plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false },
-        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: { afterLabel: item => `${total[FACTORS[item.dataIndex][0]]} games with data` } } },
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: {
+          label: i => { const g = groups[i.dataIndex]; return `${g.right}/${g.n} right (${i.raw}%)`; } } } },
       scales: {
-        x: { ...CHART_DEFAULTS.scales.x, min: 0, max: 100,
-          title: { display: true, text: '% of games where the factor leaned the right way', color: COLORS.textDim, font: { size: 11 } },
-          ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' } },
-        y: { ...CHART_DEFAULTS.scales.y, grid: { display: false } }
+        x: { ...CHART_DEFAULTS.scales.x, min: 0, max: 100, ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' } },
+        y: { ...CHART_DEFAULTS.scales.y, grid: { display: false }, ticks: { ...CHART_DEFAULTS.scales.y.ticks, font: { size: 10, style: 'italic' } } }
       }
     }
   });
 }
 
-function renderWeightsChart(id, weights) {
-  if (!weights) return;
+// Replays the engine's weight updates game by game. The bot only stores its
+// final weights, but the update is deterministic: this mirrors
+// prediction.CalculateFactorAccuracy + AdjustWeights.
+const WEIGHT_LIMITS = { winRate: [0.10, 0.40], pitcher: [0.10, 0.45], h2h: [0.02, 0.15], homeAway: [0.05, 0.25], momentum: [0.03, 0.20], stars: [0.03, 0.15] };
+function replayWeights(completed) {
+  let w = { ...DEFAULT_WEIGHTS };
+  const path = [];
+  completed.forEach((g, i) => {
+    const done = completed.slice(0, i + 1);
+    if (done.length >= 5) {
+      const lr = 0.15 / Math.sqrt(done.length), next = {};
+      FACTORS.forEach(([k]) => {
+        const xs = done.filter(d => (d.factors || {})[k]);
+        let c = w[k];
+        if (xs.length >= 5) {
+          const acc = xs.filter(d => (d.factors[k] > 0.5) === (d.actual === 'W')).length / xs.length;
+          c += lr * (acc - 0.5) * 2;
+        }
+        c += 0.02 * (DEFAULT_WEIGHTS[k] - c);
+        next[k] = Math.max(WEIGHT_LIMITS[k][0], Math.min(WEIGHT_LIMITS[k][1], c));
+      });
+      const t = Object.values(next).reduce((a, v) => a + v, 0);
+      FACTORS.forEach(([k]) => { next[k] /= t; });
+      w = next;
+    }
+    path.push({ date: g.date, w: { ...w } });
+  });
+  return path;
+}
+
+function drawTrustDrift(id, titleId, completed) {
+  const path = replayWeights(completed);
+  if (!path.length) return;
+  const starsPath = path.map(p => +(p.w.stars * 100).toFixed(1));
+  const peak = Math.max(...starsPath), low = Math.min(...starsPath), end = starsPath[starsPath.length - 1];
+  const title = document.getElementById(titleId);
+  if (title) title.textContent = `Trust in the Stars · ${Math.round(DEFAULT_WEIGHTS.stars * 100)}% → ${end.toFixed(1)}%`;
+  const datasets = FACTORS.filter(([k]) => k !== 'stars').map(([k, label], i) => ({
+    label: i === 0 ? 'Other factors' : label, factorName: label,
+    data: path.map(p => +(p.w[k] * 100).toFixed(1)),
+    borderColor: COLORS.neutral, borderWidth: 1, pointRadius: 0, tension: 0.2,
+  }));
+  datasets.unshift({ label: '🔮 Stars', factorName: 'Stars', data: starsPath, borderColor: COLORS.primary, borderWidth: 3, pointRadius: 0, tension: 0.2 });
   chart(id, {
-    type: 'bar',
-    data: {
-      labels: FACTORS.map(([, l]) => l),
-      datasets: [
-        { label: 'Learned', data: FACTORS.map(([k]) => +((weights[k] || 0) * 100).toFixed(1)),
-          backgroundColor: alpha(COLORS.primary, 0.8), borderColor: COLORS.primary, borderWidth: 1, borderRadius: 4, barThickness: 10 },
-        { label: 'Starting default', data: FACTORS.map(([k]) => +(DEFAULT_WEIGHTS[k] * 100).toFixed(1)),
-          backgroundColor: COLORS.neutral, borderRadius: 4, barThickness: 10 },
-      ]
-    },
+    type: 'line',
+    data: { labels: path.map(p => p.date.slice(5)), datasets },
     options: {
       ...CHART_DEFAULTS,
-      indexAxis: 'y',
-      plugins: { ...CHART_DEFAULTS.plugins, tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: { label: i => `${i.dataset.label}: ${i.raw}%` } } },
-      scales: {
-        x: { ...CHART_DEFAULTS.scales.x, min: 0, ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' } },
-        y: { ...CHART_DEFAULTS.scales.y, grid: { display: false } }
+      interaction: { mode: 'index', intersect: false },
+      plugins: { ...CHART_DEFAULTS.plugins,
+        legend: { labels: { color: COLORS.textDim, font: { size: 11 }, usePointStyle: true, pointStyle: 'line', filter: item => item.datasetIndex <= 1 } },
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, itemSort: (a, b) => b.raw - a.raw,
+          callbacks: { label: i => `${i.dataset.factorName}: ${i.raw}%` } } },
+      scales: { x: { ...CHART_DEFAULTS.scales.x, ticks: { ...CHART_DEFAULTS.scales.x.ticks, maxTicksLimit: 10 } },
+        y: { ...CHART_DEFAULTS.scales.y, min: 0, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } }
+    }
+  });
+  const cap = document.getElementById(id + 'Cap');
+  if (cap) {
+    const iPeak = starsPath.indexOf(peak), iLow = starsPath.indexOf(low);
+    cap.innerHTML = `Peaked at ${peak.toFixed(1)}% (${esc(fmtDate(path[iPeak].date))}), bottomed out at ${low.toFixed(1)}% (${esc(fmtDate(path[iLow].date))}).
+      <span class="pending">Reconstructed by replaying the engine's weight updates game by game.</span>`;
+  }
+}
+
+// Draws each slice's name and share on the slice itself.
+const sliceLabels = {
+  id: 'sliceLabels',
+  afterDatasetsDraw(c) {
+    const { ctx } = c;
+    const meta = c.getDatasetMeta(0);
+    ctx.save();
+    ctx.font = '600 11px system-ui, sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    meta.data.forEach((arc, i) => {
+      const v = c.data.datasets[0].data[i];
+      if (v < 6) return;
+      const p = arc.tooltipPosition();
+      ctx.fillText(c.data.labels[i], p.x, p.y - 6);
+      ctx.fillText(Math.round(v) + '%', p.x, p.y + 7);
+    });
+    ctx.restore();
+  }
+};
+
+function drawWeightsPie(id, weights) {
+  if (!weights) return;
+  const mobile = isMobile();
+  chart(id, {
+    type: 'doughnut',
+    data: {
+      labels: FACTORS.map(([, l]) => l),
+      datasets: [{ data: FACTORS.map(([k]) => +((weights[k] || 0) * 100).toFixed(1)),
+        backgroundColor: FACTORS.map(([k]) => FACTOR_COLORS[k]), borderColor: COLORS.surface, borderWidth: 2 }]
+    },
+    plugins: [sliceLabels],
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '45%',
+      plugins: {
+        legend: { position: mobile ? 'bottom' : 'right',
+          labels: { color: COLORS.textDim, font: { size: mobile ? 10 : 11 }, padding: mobile ? 8 : 12,
+            generateLabels: c => c.data.labels.map((l, i) => ({
+              text: `${l} ${Math.round(c.data.datasets[0].data[i])}% (default ${Math.round(DEFAULT_WEIGHTS[FACTORS[i][0]] * 100)}%)`,
+              fillStyle: c.data.datasets[0].backgroundColor[i], strokeStyle: COLORS.surface, fontColor: COLORS.textDim, index: i })) } },
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: { label: i => `${i.label}: ${i.raw}% (default ${Math.round(DEFAULT_WEIGHTS[FACTORS[i.dataIndex][0]] * 100)}%)` } }
       }
     }
   });
@@ -801,7 +940,7 @@ function renderOpponentChart(id, completed) {
   const opp = {};
   completed.forEach(g => {
     opp[g.opponent] = opp[g.opponent] || { correct: 0, wrong: 0 };
-    g.predicted === g.actual ? opp[g.opponent].correct++ : opp[g.opponent].wrong++;
+    hit(g) ? opp[g.opponent].correct++ : opp[g.opponent].wrong++;
   });
   const sorted = Object.entries(opp).sort((a, b) => (b[1].correct + b[1].wrong) - (a[1].correct + a[1].wrong));
   const gap = { borderColor: COLORS.surface, borderWidth: { top: 2 }, borderSkipped: false, borderRadius: 4, maxBarThickness: 56 };
@@ -826,23 +965,55 @@ function renderOpponentChart(id, completed) {
   });
 }
 
-// The standard prediction layout shared by regular season, postseason and
-// spring: accuracy, horoscope, factors, (weights), opponents, game log.
-function predictionPanels(prefix, completed, { weights, weightsTitle, team = 'Rockies' } = {}) {
-  return `<div class="grid">
-    ${panel('Prediction Accuracy Over Time', canvas(prefix + 'Acc', 280), { wide: true })}
-    ${panel('Horoscope vs Run Margin', canvas(prefix + 'Horo'), { id: prefix + 'HoroTitle' })}
-    ${panel('Factor Accuracy vs Actual Outcomes', canvas(prefix + 'Factor'))}
-    ${weights ? panel(weightsTitle, canvas(prefix + 'Weights')) : ''}
-    ${panel('Record by Opponent', canvas(prefix + 'Opp'), { wide: !weights })}
-  </div>`;
+// One square per game: fill says whether the bot was right, the letter is the
+// result. Backfilled games (before the bot was running) are neutral.
+function seasonCalendar(games) {
+  const byMonth = {};
+  games.filter(g => g.actual).forEach(g => { (byMonth[g.date.slice(0, 7)] = byMonth[g.date.slice(0, 7)] || []).push(g); });
+  const months = Object.keys(byMonth).sort();
+  if (!months.length) return '<div class="empty">No finished games yet.</div>';
+  const rows = months.map(m => {
+    const cells = byMonth[m].map(g => {
+      const cls = g.synthetic ? 'cal-syn' : hit(g) ? 'cal-hit' : 'cal-miss';
+      const what = g.synthetic ? 'no prediction (backfilled)' : `said ${g.predicted} at ${Math.round(pickConf(g) * 100)}%, ${hit(g) ? '✓ right' : '✗ wrong'}`;
+      const tip = `${g.date} ${g.isHome ? 'vs' : '@'} ${g.opponent}: ${g.actual} ${g.teamScore}-${g.oppScore} · ${what}`;
+      const inner = `<span class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}">${esc(g.actual)}</span>`;
+      return g.postUrl ? `<a href="${esc(g.postUrl)}" target="_blank" rel="noopener">${inner}</a>` : inner;
+    }).join('');
+    return `<div class="cal-row"><div class="cal-month">${esc(fmtDate(m + '-01', { month: 'short' }))}</div><div class="cal-cells">${cells}</div></div>`;
+  }).join('');
+  return `<div class="calendar">${rows}</div>
+    <div class="cal-legend"><span class="cal-hit">W</span> bot right <span class="cal-miss">W</span> bot wrong
+      <span class="cal-syn">W</span> before the bot · letter = result · hover for details, click for the post</div>`;
 }
-function drawPredictionCharts(prefix, completed, { weights, team = 'Rockies' } = {}) {
-  renderAccuracyChart(prefix + 'Acc', completed);
-  renderHoroscopeChart(prefix + 'Horo', prefix + 'HoroTitle', completed, team);
-  renderFactorChart(prefix + 'Factor', completed);
-  if (weights) renderWeightsChart(prefix + 'Weights', weights);
-  renderOpponentChart(prefix + 'Opp', completed);
+
+function highlightsPanel(games, { title, summary, baseline = 'pessimist', team = 'Rockies' }) {
+  const done = completedOf(games);
+  if (!done.length) return '';
+  const top = (xs, key) => xs.slice().sort((a, b) => key(b) - key(a))[0];
+  const upset = top(done.filter(g => g.predicted === 'L' && g.actual === 'W'), pickConf);
+  const whiff = top(done.filter(g => g.predicted === 'W' && g.actual === 'L'), pickConf);
+  const called = top(done.filter(g => g.predicted === 'L' && g.actual === 'L'), g => g.oppScore - g.teamScore);
+  let streak = 0, best = 0, bestEnd = null;
+  done.forEach(g => { streak = hit(g) ? streak + 1 : 0; if (streak > best) { best = streak; bestEnd = g.date; } });
+  const right = done.filter(hit).length;
+  const baseRight = baseline === 'pessimist' ? done.filter(g => g.actual === 'L').length : done.length / 2;
+  const diff = right - baseRight;
+  const game = g => `${esc(fmtDate(g.date))} ${g.isHome ? 'vs' : '@'} ${esc(nickname(g.opponent))}`;
+  const item = (emoji, k, body) => body ? `<div class="item"><div class="k">${emoji} ${k}</div>${body}</div>` : '';
+  const rival = baseline === 'pessimist' ? '“always pick L”' : 'a coin flip';
+
+  return `<div class="grid" style="margin-bottom:16px">${panel(title, `<div class="report">
+    ${item('🔮', 'Verdict', `${right}/${done.length} right (${pct(right, done.length)}). ${diff < 0
+      ? `${rival} would have gone ${Number.isInteger(baseRight) ? baseRight : baseRight.toFixed(1)}/${done.length}. Pessimism wins by ${Math.abs(diff)}.`
+      : diff > 0 ? `That beats ${rival} by ${diff}.` : `Exactly tied with ${rival}.`}`)}
+    ${upset ? item('🎆', 'Biggest upset', `${game(upset)}. Said L at ${Math.round(pickConf(upset) * 100)}%, then the ${esc(team)} won ${upset.teamScore}-${upset.oppScore}.`) : ''}
+    ${whiff ? item('🤦', 'Worst whiff', `${game(whiff)}. Said W at ${Math.round(pickConf(whiff) * 100)}%, lost ${whiff.teamScore}-${whiff.oppScore}.`) : ''}
+    ${called ? item('🎯', 'Called it', `${game(called)}. Said L, and it was ${called.teamScore}-${called.oppScore}.`) : ''}
+    ${best > 1 ? item('🔥', 'Longest correct streak', `${best} straight, ending ${esc(fmtDate(bestEnd))}.`) : ''}
+    ${summary && summary.factorSamples && summary.factorSamples.stars ? item('⭐', 'The stars',
+      `Leaned the right way ${Math.round(summary.factorAccuracy.stars * 100)}% of the time.`) : ''}
+  </div>`, { wide: true })}</div>`;
 }
 
 // ── game log ─────────────────────────────────────────────────────────
@@ -927,45 +1098,54 @@ const gameLog = {
 
 // ── views ────────────────────────────────────────────────────────────
 
-function reportCardPanel(s) {
-  if (!s || !s.predictions) return '';
-  const call = (c, emoji, label) => c ? `<div class="item"><div class="k">${emoji} ${label}</div>
-    ${esc(fmtDate(c.date))} ${c.isHome ? 'vs' : '@'} ${esc(nickname(c.opponent))}. Said <b>${esc(c.predicted)}</b> at
-    ${Math.round((c.predicted === 'W' ? c.winProbability : 1 - c.winProbability) * 100)}%, got ${esc(c.actual)} ${c.rockiesScore}-${c.oppScore}.</div>` : '';
-  const starsAcc = s.factorSamples && s.factorSamples.stars ? Math.round(s.factorAccuracy.stars * 100) + '%' : '—';
-  const drift = s.finalWeights && s.startWeights
-    ? `${Math.round(s.startWeights.stars * 100)}% → ${Math.round(s.finalWeights.stars * 100)}%` : '—';
-  return `<div class="grid" style="margin-bottom:16px">${panel(`📜 ${s.season} Report Card`, `<div class="report">
-    <div class="item"><div class="k">🔮 Verdict</div>${s.correct}/${s.predictions} correct (${pct(s.correct, s.predictions)}).
-      Picked a loss ${s.pickedLosses} times.</div>
-    ${call(s.bestCall, '🎯', 'Best call')}
-    ${call(s.worstMiss, '💀', 'Worst miss')}
-    <div class="item"><div class="k">⭐ The stars</div>Leaned the right way ${starsAcc} of the time.
-      Trust in the stars: ${drift}.</div>
-    <div class="item"><div class="k">🔥 Longest correct streak</div>${s.longestCorrectStreak} games</div>
-  </div>`, { wide: true })}</div>`;
+// The analysis grid shared by every prediction phase.
+function analysisHTML(prefix, { calendar, games, weights, baseline, team }) {
+  if (!completedOf(games).length) {
+    return `<div class="grid">${panel('📊 Analysis', '<div class="empty"><span class="big">⏳</span>Charts appear once the first predicted game is final.</div>', { wide: true })}</div>`;
+  }
+  return `${calendar ? `<div class="grid">${panel('🗓️ The Season, Game by Game', seasonCalendar(games), { wide: true })}</div>` : ''}
+  <div class="grid">
+    ${panel('', canvas(prefix + 'Race', 260), { wide: true, id: prefix + 'RaceTitle' })}
+    ${panel('🔬 Stars vs. Science', starsVsSciencePanel(prefix + 'Stars', completedOf(games), team))}
+    ${panel('📣 Confidence Is Decorative', confidencePanel(prefix + 'Conf', completedOf(games)).html)}
+    ${weights ? panel('', canvas(prefix + 'Drift', 240) + `<p class="caption" id="${prefix}DriftCap"></p>`, { id: prefix + 'DriftTitle' }) : ''}
+    ${weights ? panel(weights.title, canvas(prefix + 'Pie', 260)) : ''}
+    ${panel('Record by Opponent', canvas(prefix + 'Opp'), { wide: true })}
+  </div>`;
+}
+function drawAnalysis(prefix, { games, weights, baseline, team }) {
+  const done = completedOf(games);
+  if (!done.length) return;
+  renderRaceChart(prefix + 'Race', prefix + 'RaceTitle', done, baseline);
+  drawStarsBuckets(prefix + 'Stars', done, team);
+  drawConfidence(prefix + 'Conf', confidencePanel(prefix + 'Conf', done).groups);
+  if (weights) {
+    drawTrustDrift(prefix + 'Drift', prefix + 'DriftTitle', done);
+    drawWeightsPie(prefix + 'Pie', weights.values);
+  }
+  renderOpponentChart(prefix + 'Opp', done);
 }
 
 function renderRegular(main, d) {
   const games = d.regular;
   const completed = games.filter(g => g.actual);
   const real = completedOf(games);
-  const correct = real.filter(g => g.predicted === g.actual).length;
+  const correct = real.filter(hit).length;
   const wins = completed.filter(g => g.actual === 'W').length, losses = completed.length - wins;
   const acc = baseballPct(correct, real.length, 'Accuracy');
-  const win = baseballPct(wins, wins + losses, 'Win %');
+  const vsPessimist = correct - real.filter(g => g.actual === 'L').length;
   const finished = !d.live || (d.phase && d.phase !== 'regular-season');
-  const weightsTitle = d.live && d.phase === 'regular-season' ? 'Current Factor Weights' : 'Final Factor Weights';
+  const weights = d.weights ? { values: d.weights, title: finished ? 'Final Factor Weights' : 'Current Factor Weights' } : null;
 
   main.innerHTML = statCards([
     { value: `${correct}-${real.length - correct}`, label: 'Prediction Record' },
     { value: acc.value, label: acc.label },
     { value: `${wins}-${losses}`, label: 'Rockies Record' },
-    { value: win.value, label: win.label },
-  ]) + (finished ? reportCardPanel(d.summary) : '')
-    + predictionPanels('reg', real, { weights: d.weights, weightsTitle })
+    { value: signed(vsPessimist), label: vsPessimist < 0 ? 'Games behind “always pick L”' : 'Games ahead of “always pick L”' },
+  ]) + highlightsPanel(games, { title: finished ? `📜 ${d.season} Report Card` : '🌠 Cosmic Highlights (so far)', summary: d.summary })
+    + analysisHTML('reg', { calendar: true, games, weights, team: 'Rockies' })
     + gameLog.html();
-  drawPredictionCharts('reg', real, { weights: d.weights });
+  drawAnalysis('reg', { games, weights, baseline: 'pessimist', team: 'Rockies' });
   gameLog.mount(games);
 }
 
@@ -973,7 +1153,7 @@ function renderPostseason(main, d) {
   const ps = d.postseason;
   const games = ps.games;
   const real = completedOf(games);
-  const correct = real.filter(g => g.predicted === g.actual).length;
+  const correct = real.filter(hit).length;
   const wins = real.filter(g => g.actual === 'W').length;
   const acc = baseballPct(correct, real.length, 'Accuracy');
   const champ = ps.champion;
@@ -1009,7 +1189,8 @@ function renderPostseason(main, d) {
         : '<div class="empty">No adoptions yet.</div>', { wide: true })}
       ${ps.audits.length ? panel('🔭 Playoff Birth-Chart Audit', canvas('psAudit', Math.max(160, ps.audits.length * 34), { keep: true }), { wide: true }) : ''}
     </div>`
-    + predictionPanels('ps', real, { team: 'adopted team' })
+    + highlightsPanel(games, { title: '🌠 October Highlights', baseline: 'coin', team: 'adopted team' })
+    + analysisHTML('ps', { games, team: 'adopted team' })
     + gameLog.html('Adopted Team Game Log');
 
   if (ps.audits.length) {
@@ -1040,14 +1221,14 @@ function renderPostseason(main, d) {
       }
     });
   }
-  drawPredictionCharts('ps', real, { team: 'adopted team' });
+  drawAnalysis('ps', { games, baseline: 'coin', team: 'adopted team' });
   gameLog.mount(games, { series: true, team: true });
 }
 
 function renderSpring(main, d) {
   const games = d.spring;
   const real = completedOf(games);
-  const correct = real.filter(g => g.predicted === g.actual).length;
+  const correct = real.filter(hit).length;
   const wins = real.filter(g => g.actual === 'W').length;
   const acc = baseballPct(correct, real.length, 'Accuracy');
   const win = baseballPct(wins, real.length, 'Spring Win %');
@@ -1058,9 +1239,10 @@ function renderSpring(main, d) {
     { value: `${wins}-${real.length - wins}`, label: 'Rockies Spring Record' },
     { value: win.value, label: win.label },
   ]) + `<p class="note">🌵 Spring games don't count. Neither do these picks. They never touch the regular-season model.</p>`
-    + predictionPanels('sp', real)
+    + highlightsPanel(games, { title: '🌠 Spring Highlights', baseline: 'coin' })
+    + analysisHTML('sp', { calendar: true, games, team: 'Rockies' })
     + gameLog.html('Spring Game Log');
-  drawPredictionCharts('sp', real);
+  drawAnalysis('sp', { games, baseline: 'coin', team: 'Rockies' });
   gameLog.mount(games);
 }
 
