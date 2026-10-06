@@ -80,7 +80,7 @@ The Rockies' season ends in September. Rockiscope's doesn't. The bot reads MLB's
   - **The Bot vs. the Pessimist:** would "always pick L" have beaten us? (In 2026 it did, by 5.) Postseason and spring race a coin flip instead.
   - **Stars vs. Science:** who was right when the horoscope disagreed with the stats.
   - **Confidence Is Decorative:** accuracy by the confidence phrase the posts used.
-  - **Record by opponent**, and a game log with links to the Bluesky posts.
+  - **Record by opponent**, and an expandable game log. Click a game to see where it was played, both starting pitchers, the call in the post's own words, what each factor said, and links to the Bluesky post and MLB Gameday.
 - **Regular season** adds **Trust in the Stars**, the weights rebuilt game by game by replaying the engine's updates, plus the factor-weights pie.
 - **Postseason** adds the Adoption Agency (who we adopted, when they let us down) and the playoff birth-chart audit.
 - **Hot Stove** shows every roster move posted, with signs and Rockies compatibility.

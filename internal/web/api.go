@@ -39,6 +39,10 @@ type gameView struct {
 	Series         string                  `json:"series,omitempty"`
 	SeriesResult   string                  `json:"seriesResult,omitempty"`
 	PostURL        string                  `json:"postUrl,omitempty"`
+	GamePk         int                     `json:"gamePk,omitempty"`
+	GameNumber     int                     `json:"gameNumber,omitempty"`
+	TeamStarter    *prediction.Starter     `json:"teamStarter,omitempty"`
+	OppStarter     *prediction.Starter     `json:"oppStarter,omitempty"`
 }
 
 type picksSummary struct {
@@ -321,7 +325,8 @@ func regularGames(recs []prediction.PredictionRecord) []gameView {
 			Date: p.Date, Team: "Colorado Rockies", Opponent: p.Opponent, IsHome: p.IsHome,
 			Predicted: p.Predicted, Actual: p.Actual, TeamScore: p.RockiesScore, OppScore: p.OppScore,
 			WinProbability: p.WinProbability, Factors: p.Factors, Synthetic: p.Synthetic,
-			PostURL: postURL(p.PostURI),
+			PostURL: postURL(p.PostURI), GamePk: p.GamePK, GameNumber: p.GameNumber,
+			TeamStarter: p.RockiesStarter, OppStarter: p.OppStarter,
 		})
 	}
 	sort.SliceStable(out, func(i, j int) bool { return out[i].Date < out[j].Date })
@@ -339,6 +344,7 @@ func pickGames(picks []seasonstate.Pick) []gameView {
 			Predicted: p.Pick, TeamScore: p.TeamScore, OppScore: p.OppScore,
 			WinProbability: p.WinProbability, Factors: p.Factors,
 			Series: p.Series, SeriesResult: p.SeriesResult, PostURL: postURL(p.PostURI),
+			GamePk: p.GamePk, TeamStarter: p.TeamStarter, OppStarter: p.OppStarter,
 		}
 		if p.Result == "W" || p.Result == "L" {
 			g.Actual = p.Result
