@@ -214,7 +214,7 @@
     .grid { grid-template-columns: 1fr; gap: 12px; margin-bottom: 14px; }
     .panel { padding: 14px; border-radius: 10px; }
     .panel h2 { font-size: 12px; margin-bottom: 10px; }
-    .chart-wrap { height: 220px !important; }
+    .chart-wrap:not(.keep) { height: 220px !important; }
     .filter-bar { gap: 6px; }
     .filter-bar .chip { font-size: 11px; padding: 6px 10px; }
     table { font-size: 12px; }
@@ -222,6 +222,121 @@
     th { font-size: 10px; }
     .pagination button { padding: 8px 14px; font-size: 14px; }
     .pagination { gap: 6px; }
+  }
+
+  /* ── season navigation ── */
+  .nav {
+    max-width: 1200px;
+    margin: 0 auto 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .chip-row { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+  .chip-row .chip {
+    font-size: 13px;
+    padding: 6px 14px;
+    border-radius: 20px;
+    border: 1px solid var(--card-border);
+    background: var(--card-bg);
+    color: var(--text);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-family: inherit;
+  }
+  .chip-row .chip:hover, .chip-row .chip.active {
+    background: rgba(200,170,255,0.15);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .chip-row .chip .live-dot {
+    display: inline-block; width: 7px; height: 7px; border-radius: 50%;
+    background: var(--green); margin-right: 6px; vertical-align: 1px;
+  }
+  .tabs .chip { border-radius: 8px; }
+
+  /* ── phase banner ── */
+  .banner {
+    max-width: 1200px;
+    margin: 0 auto 16px;
+    padding: 14px 18px;
+    border-radius: 12px;
+    border: 1px solid rgba(200,170,255,0.25);
+    background: linear-gradient(90deg, rgba(200,170,255,0.10), rgba(200,170,255,0.03));
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .banner .emoji { font-size: 28px; line-height: 1; }
+  .banner .main { flex: 1; min-width: 200px; }
+  .banner .headline { font-weight: 700; color: var(--accent); font-size: 16px; }
+  .banner .sub { color: var(--text-dim); font-size: 13px; margin-top: 3px; }
+  .banner .side { color: var(--text); font-size: 13px; text-align: right; }
+  .banner .side b { color: var(--accent); font-size: 22px; display: block; }
+
+  /* ── cards & feeds ── */
+  .note { color: var(--text-dim); font-size: 13px; font-style: italic; text-align: center; max-width: 1200px; margin: -8px auto 16px; }
+  .empty { color: var(--text-dim); text-align: center; padding: 40px 20px; font-size: 14px; }
+  .empty .big { font-size: 40px; display: block; margin-bottom: 10px; }
+  .adoptions { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; }
+  .adopt-card {
+    border: 1px solid var(--card-border);
+    border-radius: 10px;
+    padding: 14px;
+    background: rgba(255,255,255,0.02);
+  }
+  .adopt-card.current { border-color: var(--accent); background: rgba(200,170,255,0.08); }
+  .adopt-card.champ { border-color: var(--yellow); background: rgba(255,208,123,0.08); }
+  .adopt-card .team { font-weight: 700; font-size: 15px; }
+  .adopt-card .when { color: var(--text-dim); font-size: 12px; margin: 4px 0 8px; }
+  .adopt-card .reading { font-size: 12px; line-height: 1.6; }
+  .adopt-card .fate { font-size: 12px; font-weight: 600; margin-top: 8px; }
+  .fate.alive { color: var(--green); }
+  .fate.out { color: var(--red); }
+  .fate.won { color: var(--yellow); }
+  .report { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+  .report .item { border: 1px solid var(--card-border); border-radius: 10px; padding: 12px 14px; font-size: 13px; line-height: 1.5; }
+  .report .item .k { color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 4px; }
+  .feed { list-style: none; }
+  .feed li { display: flex; gap: 12px; padding: 12px 4px; border-bottom: 1px solid rgba(255,255,255,0.04); align-items: flex-start; }
+  .feed .icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
+  .feed .body { flex: 1; min-width: 0; font-size: 13px; line-height: 1.5; }
+  .feed .meta { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+  a.post-link { color: var(--accent); text-decoration: none; font-size: 12px; white-space: nowrap; }
+  a.post-link:hover { text-decoration: underline; }
+  tr.clickable { cursor: pointer; }
+  .num { font-variant-numeric: tabular-nums; }
+
+
+  /* ── analysis ── */
+  .caption { color: var(--text-dim); font-size: 12px; line-height: 1.5; margin-top: 10px; }
+  .caption b { color: var(--text); }
+  .versus { display: flex; align-items: center; justify-content: center; gap: 24px; text-align: center; margin: 4px 0 6px; }
+  .versus .big { font-size: 40px; font-weight: 700; color: var(--accent); line-height: 1; }
+  .versus .label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+  .versus .vs { color: var(--text-dim); font-size: 14px; font-style: italic; }
+  .calendar { display: flex; flex-direction: column; gap: 6px; }
+  .cal-row { display: flex; gap: 10px; align-items: flex-start; }
+  .cal-month { width: 34px; flex-shrink: 0; color: var(--text-dim); font-size: 11px; text-transform: uppercase; letter-spacing: 1px; padding-top: 3px; }
+  .cal-cells { display: flex; flex-wrap: wrap; gap: 3px; }
+  .cal-cells a { text-decoration: none; }
+  .calendar span, .cal-legend span {
+    display: inline-flex; align-items: center; justify-content: center;
+    width: 20px; height: 20px; border-radius: 4px; font-size: 10px; font-weight: 700; color: #fff;
+  }
+  .cal-hit { background: #2FA3BC; }
+  .cal-miss { background: #D9587D; }
+  .cal-syn { background: rgba(230,220,255,0.18); color: var(--text-dim) !important; }
+  .calendar span:hover { outline: 2px solid var(--accent); outline-offset: 1px; }
+  .cal-legend { color: var(--text-dim); font-size: 12px; margin-top: 12px; display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+  .cal-legend span { width: 16px; height: 16px; font-size: 9px; margin-left: 6px; }
+
+  @media (max-width: 768px) {
+    .banner { padding: 12px; gap: 10px; }
+    .banner .side { text-align: left; }
+    .chip-row .chip { font-size: 12px; padding: 6px 11px; }
+    .feed li { gap: 8px; }
   }
 </style>
 </head>
@@ -242,75 +357,35 @@
   </div>
 </header>
 
-<div class="stats-row" id="statsRow"></div>
-
-<div class="grid">
-  <div class="panel wide">
-    <h2>Prediction Accuracy Over Time</h2>
-    <div class="chart-wrap" style="height:280px"><canvas id="accuracyChart"></canvas></div>
-  </div>
-  <div class="panel">
-    <h2 id="horoscopeTitle">Horoscope vs Run Margin</h2>
-    <div class="chart-wrap" style="height:260px"><canvas id="horoscopeChart"></canvas></div>
-  </div>
-  <div class="panel">
-    <h2>Factor Accuracy vs Actual Outcomes</h2>
-    <div class="chart-wrap" style="height:260px"><canvas id="factorChart"></canvas></div>
-  </div>
-  <div class="panel">
-    <h2>Current Factor Weights</h2>
-    <div class="chart-wrap" style="height:260px"><canvas id="weightsChart"></canvas></div>
-  </div>
-  <div class="panel">
-    <h2>Record by Opponent</h2>
-    <div class="chart-wrap" style="height:260px"><canvas id="opponentChart"></canvas></div>
-  </div>
-</div>
-
-<div class="game-log panel">
-  <h2>Game Log</h2>
-  <div class="filter-bar" id="filterBar">
-    <span class="chip active" data-filter="all">All</span>
-  </div>
-  <div class="table-scroll">
-  <table>
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Opponent</th>
-        <th>H/A</th>
-        <th>Predicted</th>
-        <th>Actual</th>
-        <th>Win Prob</th>
-        <th>Result</th>
-      </tr>
-    </thead>
-    <tbody id="logBody"></tbody>
-  </table>
-  </div>
-  <div class="pagination" id="pagination"></div>
-</div>
+<div id="banner"></div>
+<nav class="nav" aria-label="Seasons">
+  <div class="chip-row" id="seasonBar" role="tablist"></div>
+  <div class="chip-row tabs" id="viewTabs" role="tablist"></div>
+</nav>
+<main id="view"></main>
 
 <script>
+// Chart colors are validated for color-vision deficiency against the dark
+// surface (dataviz validator): correct/win, wrong/loss, primary, secondary.
 const COLORS = {
   accent: '#C8AAFF',
-  accentDim: 'rgba(200,170,255,0.3)',
-  green: '#7BE0AD',
-  greenDim: 'rgba(123,224,173,0.2)',
-  red: '#FF8A9B',
-  redDim: 'rgba(255,138,155,0.2)',
-  yellow: '#FFD07B',
+  good: '#2FA3BC',
+  bad: '#D9587D',
+  primary: '#9C7BE6',
+  secondary: '#B5862A',
+  neutral: 'rgba(230,220,255,0.28)',
   text: '#E6DCFF',
-  textDim: 'rgba(230,220,255,0.4)',
+  textDim: 'rgba(230,220,255,0.5)',
   grid: 'rgba(255,255,255,0.06)',
-  factors: ['#C8AAFF','#7BE0AD','#FF8A9B','#FFD07B','#82B1FF','#FF80AB']
+  surface: '#22123F',
 };
+const alpha = (hex, a) => hex + Math.round(a * 255).toString(16).padStart(2, '0');
 
 const CHART_DEFAULTS = {
   responsive: true,
   maintainAspectRatio: false,
   plugins: {
-    legend: { labels: { color: COLORS.textDim, font: { size: 11 } } },
+    legend: { labels: { color: COLORS.textDim, font: { size: 11 }, usePointStyle: true } },
     tooltip: {
       backgroundColor: '#1E1240',
       borderColor: 'rgba(200,170,255,0.3)',
@@ -327,11 +402,20 @@ const CHART_DEFAULTS = {
   }
 };
 
-let allGames = [];
-let activeFilter = 'all';
-let currentPage = 1;
-let filteredGames = [];
-const PAGE_SIZE = 20;
+const FACTORS = [
+  ['winRate', 'Win Rate'], ['pitcher', 'Pitcher'], ['h2h', 'H2H'],
+  ['homeAway', 'Home/Away'], ['momentum', 'Momentum'], ['stars', 'Stars'],
+];
+const DEFAULT_WEIGHTS = { winRate: 0.25, pitcher: 0.35, h2h: 0.05, homeAway: 0.15, momentum: 0.10, stars: 0.10 };
+const SIGNS = ['Aries','Taurus','Gemini','Cancer','Leo','Virgo','Libra','Scorpio','Sagittarius','Capricorn','Aquarius','Pisces'];
+const SIGN_EMOJI = { Aries:'♈', Taurus:'♉', Gemini:'♊', Cancer:'♋', Leo:'♌', Virgo:'♍', Libra:'♎', Scorpio:'♏', Sagittarius:'♐', Capricorn:'♑', Aquarius:'♒', Pisces:'♓' };
+const TXN_EMOJI = { TR:'🔁', SFA:'✍️', CLW:'🪝', DES:'🚪', REL:'👋', DFA:'🕊️', R5:'🎲' };
+const VIEWS = {
+  regular: '⚾ Regular Season',
+  postseason: '🍼 Postseason',
+  spring: '🌵 Spring Training',
+  hotstove: '🔥 Hot Stove',
+};
 
 const TEAM_ABBR = {
   'Arizona Diamondbacks': 'ARI', 'Atlanta Braves': 'ATL', 'Baltimore Orioles': 'BAL',
@@ -340,484 +424,963 @@ const TEAM_ABBR = {
   'Detroit Tigers': 'DET', 'Houston Astros': 'HOU', 'Kansas City Royals': 'KC',
   'Los Angeles Angels': 'LAA', 'Los Angeles Dodgers': 'LAD', 'Miami Marlins': 'MIA',
   'Milwaukee Brewers': 'MIL', 'Minnesota Twins': 'MIN', 'New York Mets': 'NYM',
-  'New York Yankees': 'NYY', 'Oakland Athletics': 'OAK', 'Philadelphia Phillies': 'PHI',
+  'New York Yankees': 'NYY', 'Oakland Athletics': 'OAK', 'Athletics': 'ATH', 'Philadelphia Phillies': 'PHI',
   'Pittsburgh Pirates': 'PIT', 'San Diego Padres': 'SD', 'San Francisco Giants': 'SF',
   'Seattle Mariners': 'SEA', 'St. Louis Cardinals': 'STL', 'Tampa Bay Rays': 'TB',
   'Texas Rangers': 'TEX', 'Toronto Blue Jays': 'TOR', 'Washington Nationals': 'WSH',
 };
+
+// ── helpers ──────────────────────────────────────────────────────────
+
+function esc(v) {
+  return String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+}
 function isMobile() { return window.innerWidth < 768; }
 function teamName(full) { return isMobile() ? (TEAM_ABBR[full] || full) : full; }
-
-async function init() {
-  const resp = await fetch('/api/predictions');
-  const data = await resp.json();
-
-  const games = (data.predictions || []).filter(p => p.predicted !== 'N/A');
-  const completed = games.filter(g => g.actual);
-  const realCompleted = completed.filter(g => !g.synthetic);
-  allGames = games;
-
-  renderStats(completed, realCompleted, data.currentWeights);
-  renderAccuracyChart(realCompleted);
-  renderHoroscopeChart(realCompleted);
-  renderFactorChart(realCompleted);
-  renderWeightsChart(data.currentWeights);
-  renderOpponentChart(realCompleted);
-  renderGameLog(games);
+function shortTeam(full) {
+  return String(full || '').replace(/^(Los Angeles|San Diego|San Francisco|New York) /, (_, c) =>
+    ({ 'Los Angeles': 'LA ', 'San Diego': 'SD ', 'San Francisco': 'SF ', 'New York': 'NY ' })[c] || c + ' ');
+}
+function nickname(full) {
+  const s = String(full || '');
+  for (const two of ['Red Sox', 'White Sox', 'Blue Jays']) if (s.endsWith(two)) return two;
+  return s.split(' ').pop();
+}
+function fmtDate(d, opts = { month: 'short', day: 'numeric' }) {
+  if (!d) return '';
+  const [y, m, day] = d.split('-').map(Number);
+  return new Date(y, m - 1, day).toLocaleDateString(undefined, opts);
+}
+function pct(n, d) { return d ? Math.round((n / d) * 100) + '%' : '—'; }
+function baseballPct(num, denom, label) {
+  if (!denom) return { value: '—', label };
+  const p = num / denom;
+  const value = p.toFixed(3).replace(/^0/, '');
+  const diff = p - 0.5;
+  const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';
+  return { value, label: `${label} (${sign}${Math.abs(diff).toFixed(3).replace(/^0/, '')} vs .500)` };
+}
+function postLink(url, label = 'post ↗') {
+  return url ? `<a class="post-link" href="${esc(url)}" target="_blank" rel="noopener">${label}</a>` : '';
+}
+function statCards(cards) {
+  return `<div class="stats-row">${cards.map(c =>
+    `<div class="stat-card"><div class="value num">${esc(c.value)}</div><div class="label">${esc(c.label)}</div></div>`).join('')}</div>`;
+}
+function panel(title, body, { wide = false, id = '' } = {}) {
+  return `<div class="panel${wide ? ' wide' : ''}"><h2${id ? ` id="${id}"` : ''}>${title}</h2>${body}</div>`;
+}
+// keep: hold this height on mobile too (charts with one row per category).
+function canvas(id, height = 260, { keep = false } = {}) {
+  return `<div class="chart-wrap${keep ? ' keep' : ''}" style="height:${height}px"><canvas id="${id}"></canvas></div>`;
+}
+function emptyState(emoji, text) {
+  return `<div class="panel" style="max-width:1200px;margin:0 auto"><div class="empty"><span class="big">${emoji}</span>${text}</div></div>`;
 }
 
-function renderStats(completed, realCompleted, weights) {
-  const correct = realCompleted.filter(g => g.predicted === g.actual).length;
-  const total = realCompleted.length;
-  const wins = completed.filter(g => g.actual === 'W').length;
-  const losses = completed.filter(g => g.actual === 'L').length;
+let charts = [];
+function chart(id, config) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  charts.push(new Chart(el, config));
+}
+function destroyCharts() { charts.forEach(c => c.destroy()); charts = []; }
 
-  const baseballPct = (num, denom, label) => {
-    if (!denom) return { value: '—', label };
-    const p = num / denom;
-    const value = p.toFixed(3).replace(/^0/, '');
-    const diff = p - 0.5;
-    const sign = diff > 0 ? '+' : diff < 0 ? '−' : '';
-    const diffStr = Math.abs(diff).toFixed(3).replace(/^0/, '');
-    return { value, label: `${label} (${sign}${diffStr} vs .500)` };
-  };
-
-  const acc = baseballPct(correct, total, 'Accuracy');
-  const win = baseballPct(wins, wins + losses, 'Win %');
-
-  document.getElementById('statsRow').innerHTML = `
-    <div class="stat-card"><div class="value">${correct}-${total - correct}</div><div class="label">Prediction Record</div></div>
-    <div class="stat-card"><div class="value">${acc.value}</div><div class="label">${acc.label}</div></div>
-    <div class="stat-card"><div class="value">${wins}-${losses}</div><div class="label">Rockies Record</div></div>
-    <div class="stat-card"><div class="value">${win.value}</div><div class="label">${win.label}</div></div>
-  `;
+async function getJSON(url) {
+  const resp = await fetch(url, { cache: 'no-store' });
+  if (!resp.ok) throw new Error(`${url} returned ${resp.status}`);
+  return resp.json();
 }
 
-function renderAccuracyChart(completed) {
-  const labels = [];
-  const cumAcc = [];
-  const rollingAcc = [];
-  let correct = 0;
+// ── app state & routing ──────────────────────────────────────────────
 
-  completed.forEach((g, i) => {
-    if (g.predicted === g.actual) correct++;
-    labels.push(g.date.slice(5)); // MM-DD
-    cumAcc.push(((correct / (i + 1)) * 100).toFixed(1));
+const app = { status: null, seasons: [], details: {}, season: null, view: null };
 
-    const windowSize = Math.min(10, i + 1);
-    const window = completed.slice(Math.max(0, i - 9), i + 1);
-    const windowCorrect = window.filter(w => w.predicted === w.actual).length;
-    rollingAcc.push(((windowCorrect / windowSize) * 100).toFixed(1));
+function parseHash() {
+  const [, season, view] = location.hash.split('/');
+  return { season: season === 'all' ? 'all' : (parseInt(season, 10) || null), view: view || null };
+}
+function go(season, view) {
+  const hash = season === 'all' ? '#/all' : `#/${season}${view ? '/' + view : ''}`;
+  if (location.hash === hash) route(); else location.hash = hash;
+}
+
+function availableViews(d) {
+  const v = [];
+  if (d.regular.length) v.push('regular');
+  if (d.postseason.adoptions.length || d.postseason.games.length) v.push('postseason');
+  if (d.spring.length) v.push('spring');
+  if (d.hotStove.length || (d.live && app.status?.phase === 'offseason')) v.push('hotstove');
+  return v;
+}
+
+function defaultView(d, views) {
+  if (d.live) {
+    const byPhase = {
+      'postseason': ['postseason', 'regular'],
+      'offseason': ['hotstove', 'postseason', 'regular'],
+      'spring-training': ['spring', 'hotstove', 'regular'],
+      'regular-season': ['regular'],
+    }[d.phase] || [];
+    for (const v of byPhase) if (views.includes(v)) return v;
+  }
+  return views[0] || null;
+}
+
+async function route() {
+  const { season, view } = parseHash();
+  app.season = season || app.seasons.find(s => s.live)?.season || app.seasons[0]?.season || null;
+  renderSeasonBar();
+  destroyCharts();
+  const main = document.getElementById('view');
+
+  if (!app.season) {
+    document.getElementById('viewTabs').innerHTML = '';
+    main.innerHTML = emptyState('🔭', 'No predictions yet. The stars are still warming up.');
+    return;
+  }
+  if (app.season === 'all') {
+    document.getElementById('viewTabs').innerHTML = '';
+    renderAllTime(main);
+    return;
+  }
+
+  let d = app.details[app.season];
+  if (!d) {
+    main.innerHTML = '<div class="empty">Consulting the archives…</div>';
+    try {
+      d = app.details[app.season] = await getJSON(`/api/season/${app.season}`);
+    } catch (e) {
+      main.innerHTML = emptyState('🌑', `Couldn't load ${esc(app.season)}: ${esc(e.message)}`);
+      return;
+    }
+  }
+  const views = availableViews(d);
+  app.view = views.includes(view) ? view : defaultView(d, views);
+  renderTabs(views);
+
+  if (!app.view) {
+    main.innerHTML = emptyState('🌌', `Nothing tracked for ${esc(app.season)} yet.`);
+    return;
+  }
+  ({ regular: renderRegular, postseason: renderPostseason, spring: renderSpring, hotstove: renderHotStove })[app.view](main, d);
+}
+
+function renderSeasonBar() {
+  const chips = app.seasons.map(s => {
+    const active = s.season === app.season ? ' active' : '';
+    const dot = s.live ? '<span class="live-dot" title="Live"></span>' : '';
+    return `<button class="chip${active}" role="tab" aria-selected="${!!active}" onclick="go(${s.season})">${dot}${s.season}</button>`;
   });
+  if (app.seasons.length) {
+    const active = app.season === 'all' ? ' active' : '';
+    chips.push(`<button class="chip${active}" role="tab" aria-selected="${!!active}" onclick="go('all')">📚 All-time</button>`);
+  }
+  document.getElementById('seasonBar').innerHTML = chips.join('');
+}
 
-  new Chart(document.getElementById('accuracyChart'), {
+function renderTabs(views) {
+  document.getElementById('viewTabs').innerHTML = views.length > 1 ? views.map(v =>
+    `<button class="chip${v === app.view ? ' active' : ''}" role="tab" aria-selected="${v === app.view}" onclick="go(${app.season}, '${v}')">${VIEWS[v]}</button>`
+  ).join('') : '';
+}
+
+// ── phase banner ─────────────────────────────────────────────────────
+
+function renderBanner(s) {
+  const el = document.getElementById('banner');
+  if (!s || !s.phase) { el.innerHTML = ''; return; }
+  const cd = s.countdown;
+  const countdownSide = cd ? `<div class="side"><b class="num">${cd.days}</b>days to Opening Day</div>` : '';
+  let emoji, headline, sub = '', side = '';
+
+  switch (s.phase) {
+    case 'postseason': {
+      emoji = '🍼';
+      const a = s.adoption;
+      if (s.champion) {
+        headline = `${esc(s.champion)} won the World Series`;
+      } else if (a) {
+        headline = a.eliminatedOn ? `${esc(a.teamName)} eliminated. Finding a new family…` : `Adopted: ${esc(a.teamName)}`;
+      } else {
+        headline = 'Postseason. Auditing playoff birth charts…';
+      }
+      const parts = [];
+      const lp = s.lastPick;
+      if (lp && lp.series) parts.push(esc(lp.series) + (lp.seriesResult ? ` · ${esc(lp.seriesResult)}` : ''));
+      if (s.postseason) parts.push(`Picks ${s.postseason.correct}/${s.postseason.picks}`);
+      if (a && a.reading) parts.push(`🌊 ${Math.round(a.reading.waterShare * 100)}% water signs`);
+      sub = parts.join(' · ');
+      if (s.postseason) side = `<div class="side"><b class="num">${s.postseason.correct}-${s.postseason.picks - s.postseason.correct}</b>postseason picks</div>`;
+      break;
+    }
+    case 'offseason': {
+      emoji = '🔥';
+      headline = 'Hot stove season';
+      const m = s.latestMove;
+      sub = m ? `Latest: ${esc(m.description)}` : 'Waiting on the front office. As usual.';
+      if (cd) sub += ` · Opening Day ${esc(fmtDate(cd.openingDay))}${cd.opponent ? ` ${cd.isHome ? 'vs' : '@'} ${esc(cd.opponent)}` : ''}`;
+      side = countdownSide;
+      break;
+    }
+    case 'spring-training': {
+      emoji = '🌵';
+      headline = "Spring training. It doesn't count. Neither does this.";
+      sub = s.spring ? `Spring picks ${s.spring.correct}/${s.spring.picks}` : 'No spring picks yet';
+      side = countdownSide;
+      break;
+    }
+    default: {
+      emoji = '⚾';
+      headline = `${s.season} regular season`;
+      const r = s.rockies;
+      if (r) {
+        sub = `Rockies ${r.rockiesWins}-${r.rockiesLosses} · Predictions ${r.correct}/${r.predictions}`;
+        side = `<div class="side"><b class="num">${pct(r.correct, r.predictions)}</b>prediction accuracy</div>`;
+      }
+    }
+  }
+  el.innerHTML = `<div class="banner" role="status"><span class="emoji">${emoji}</span>
+    <div class="main"><div class="headline">${headline}</div><div class="sub">${sub}</div></div>${side}</div>`;
+}
+
+// ── shared chart components ──────────────────────────────────────────
+
+const completedOf = games => games.filter(g => g.actual && !g.synthetic);
+const hit = g => g.predicted === g.actual;
+const pickConf = g => g.predicted === 'W' ? g.winProbability : 1 - g.winProbability;
+const signed = n => (n > 0 ? '+' : n < 0 ? '−' : '') + Math.abs(n);
+
+// Factor colors for the weights pie, ordered so neighboring slices (including
+// the wrap-around) pass the CVD check. Slices are also direct-labeled.
+const FACTOR_COLORS = {
+  winRate: '#2FA3BC', pitcher: '#D9587D', h2h: '#B5862A',
+  homeAway: '#5A8BE8', momentum: '#C7792E', stars: '#9C7BE6',
+};
+
+// The engine's confidence phrases, as they appear in posts.
+const CONFIDENCE = [
+  ['coin', 'A cosmic coin flip'],
+  ['nudge', 'A slight celestial nudge'],
+  ['lean', 'The stars lean toward'],
+  ['strong', 'The cosmos strongly favor'],
+  ['scream', 'The stars are screaming'],
+];
+
+// Bot vs a baseline, game by game. Regular season: "always pick L" (the
+// pessimist). Postseason/spring: a coin flip.
+function renderRaceChart(id, titleId, completed, baseline) {
+  const labels = [], lead = [];
+  let bot = 0, base = 0;
+  completed.forEach((g, i) => {
+    bot += hit(g) ? 1 : 0;
+    base += baseline === 'pessimist' ? (g.actual === 'L' ? 1 : 0) : 0.5;
+    labels.push(g.date.slice(5));
+    lead.push(+(bot - base).toFixed(1));
+  });
+  const final = lead.length ? lead[lead.length - 1] : 0;
+  const rival = baseline === 'pessimist' ? 'the Pessimist' : 'a Coin Flip';
+  const title = document.getElementById(titleId);
+  if (title) {
+    title.textContent = `The Bot vs. ${rival} · ` + (!lead.length ? 'no games yet'
+      : final > 0 ? `bot leads by ${final}` : final < 0 ? `${baseline === 'pessimist' ? 'pessimist' : 'coin'} leads by ${-final}` : 'dead even');
+  }
+
+  chart(id, {
     type: 'line',
     data: {
       labels,
-      datasets: [
-        {
-          label: 'Cumulative %',
-          data: cumAcc,
-          borderColor: COLORS.accent,
-          backgroundColor: COLORS.accentDim,
-          fill: true,
-          tension: 0.3,
-          pointRadius: 3,
-          pointHoverRadius: 6,
-          pointBackgroundColor: completed.map(g => g.predicted === g.actual ? COLORS.green : COLORS.red),
-        },
-        {
-          label: 'Rolling 10-game %',
-          data: rollingAcc,
-          borderColor: COLORS.yellow,
-          borderDash: [5, 3],
-          tension: 0.3,
-          pointRadius: 0,
-          fill: false,
-        },
-        {
-          label: '50% baseline',
-          data: cumAcc.map(() => 50),
-          borderColor: COLORS.textDim,
-          borderDash: [2, 4],
-          pointRadius: 0,
-          fill: false,
-        }
-      ]
+      datasets: [{
+        label: baseline === 'pessimist' ? 'Games ahead of "always pick L"' : 'Games ahead of a coin flip',
+        data: lead, borderColor: COLORS.primary, borderWidth: 2, tension: 0.25,
+        pointRadius: completed.length > 60 ? 0 : 3, pointHoverRadius: 6,
+        fill: { target: 'origin', above: alpha(COLORS.good, 0.25), below: alpha(COLORS.bad, 0.25) },
+      }]
     },
     options: {
       ...CHART_DEFAULTS,
-      onClick: (e, elements) => {
-        if (elements.length > 0) {
-          const idx = elements[0].index;
-          const game = completed[idx];
-          filterLog(game.opponent);
-        }
-      },
+      interaction: { mode: 'index', intersect: false },
       plugins: {
         ...CHART_DEFAULTS.plugins,
-        legend: { labels: { color: COLORS.textDim, font: { size: 11 }, usePointStyle: true, pointStyle: 'line' } },
-        tooltip: {
-          ...CHART_DEFAULTS.plugins.tooltip,
-          callbacks: {
-            afterTitle: (items) => {
-              const g = completed[items[0].dataIndex];
-              return `${g.opponent} — ${g.predicted === g.actual ? 'Correct' : 'Wrong'}`;
-            }
-          }
-        }
+        legend: { display: false },
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: {
+          title: items => { const g = completed[items[0].dataIndex]; return `${g.date} vs ${g.opponent}`; },
+          label: item => { const g = completed[item.dataIndex], v = item.raw;
+            return [`Bot ${hit(g) ? '✓ right' : '✗ wrong'} (said ${g.predicted}, got ${g.actual})`,
+              v > 0 ? `Bot ahead by ${v}` : v < 0 ? `Bot behind by ${-v}` : 'Dead even']; } } }
       },
       scales: {
-        ...CHART_DEFAULTS.scales,
-        y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } }
+        x: { ...CHART_DEFAULTS.scales.x, ticks: { ...CHART_DEFAULTS.scales.x.ticks, maxTicksLimit: 12 } },
+        y: { ...CHART_DEFAULTS.scales.y,
+          title: { display: true, text: '← behind · games · ahead →', color: COLORS.textDim, font: { size: 11 } },
+          grid: { ...CHART_DEFAULTS.scales.y.grid,
+            color: ctx => ctx.tick.value === 0 ? 'rgba(200,170,255,0.45)' : COLORS.grid,
+            lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1 } }
       }
     }
   });
 }
 
-function renderHoroscopeChart(completed) {
-  const scored = completed.filter(g =>
-    g.factors && typeof g.factors.stars === 'number' && g.factors.stars !== 0
-    && typeof g.rockiesScore === 'number' && typeof g.oppScore === 'number'
-    && (g.rockiesScore > 0 || g.oppScore > 0));
-
-  const wins = [];
-  const losses = [];
-  const xs = [], ys = [];
-  scored.forEach(g => {
-    const x = g.factors.stars * 100;
-    const y = g.rockiesScore - g.oppScore;
-    const point = { x, y, g };
-    xs.push(x); ys.push(y);
-    if (g.actual === 'W') wins.push(point);
-    else losses.push(point);
-  });
-
-  const pearson = (xs, ys) => {
-    const n = xs.length;
-    if (n < 2) return null;
-    const mx = xs.reduce((a, b) => a + b, 0) / n;
-    const my = ys.reduce((a, b) => a + b, 0) / n;
-    let num = 0, dx2 = 0, dy2 = 0;
-    for (let i = 0; i < n; i++) {
-      const dx = xs[i] - mx, dy = ys[i] - my;
-      num += dx * dy; dx2 += dx * dx; dy2 += dy * dy;
-    }
-    if (dx2 === 0 || dy2 === 0) return null;
-    return num / Math.sqrt(dx2 * dy2);
-  };
-
-  const r = pearson(xs, ys);
-  const title = document.getElementById('horoscopeTitle');
-  if (r === null) {
-    title.textContent = `Horoscope vs Run Margin · cosmic r=—`;
-  } else {
-    title.textContent = `Horoscope vs Run Margin · cosmic r=${r.toFixed(2)}`;
-  }
-
-  const noData = scored.length === 0;
-
-  new Chart(document.getElementById('horoscopeChart'), {
-    type: 'scatter',
-    data: {
-      datasets: [
-        {
-          label: 'Win',
-          data: wins,
-          backgroundColor: COLORS.green + 'aa',
-          borderColor: COLORS.green,
-          pointRadius: 5,
-          pointHoverRadius: 7,
-        },
-        {
-          label: 'Loss',
-          data: losses,
-          backgroundColor: COLORS.red + 'aa',
-          borderColor: COLORS.red,
-          pointStyle: 'crossRot',
-          pointRadius: 6,
-          pointHoverRadius: 8,
-        }
-      ]
-    },
-    options: {
-      ...CHART_DEFAULTS,
-      plugins: {
-        ...CHART_DEFAULTS.plugins,
-        legend: { labels: { color: COLORS.textDim, font: { size: 11 } } },
-        tooltip: {
-          ...CHART_DEFAULTS.plugins.tooltip,
-          callbacks: {
-            label: (item) => {
-              const g = item.raw.g;
-              const margin = g.rockiesScore - g.oppScore;
-              const sign = margin > 0 ? '+' : '';
-              return `${g.date} vs ${g.opponent}: stars ${item.raw.x.toFixed(0)}%, ${g.rockiesScore}-${g.oppScore} (${sign}${margin})`;
-            }
-          }
-        },
-        subtitle: noData ? {
-          display: true,
-          text: 'No completed games with horoscope + score data yet',
-          color: COLORS.textDim,
-          font: { size: 12, style: 'italic' },
-          padding: { top: 20 }
-        } : { display: false }
-      },
-      scales: {
-        x: {
-          ...CHART_DEFAULTS.scales.x,
-          min: 0, max: 100,
-          title: { display: true, text: 'Stars favor Rockies →', color: COLORS.textDim, font: { size: 11 } },
-          ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' }
-        },
-        y: {
-          ...CHART_DEFAULTS.scales.y,
-          title: { display: true, text: 'Run margin (Rockies − Opp)', color: COLORS.textDim, font: { size: 11 } },
-          grid: {
-            ...CHART_DEFAULTS.scales.y.grid,
-            color: ctx => ctx.tick.value === 0 ? 'rgba(200,170,255,0.35)' : COLORS.grid,
-            lineWidth: ctx => ctx.tick.value === 0 ? 1.5 : 1,
-          }
-        }
-      }
-    }
-  });
-}
-
-function renderFactorChart(completed) {
-  const factorNames = ['winRate', 'pitcher', 'h2h', 'homeAway', 'momentum', 'stars'];
-  const labels = ['Win Rate', 'Pitcher', 'H2H', 'Home/Away', 'Momentum', 'Stars'];
-  const correct = {};
-  const total = {};
-  factorNames.forEach(f => { correct[f] = 0; total[f] = 0; });
-
+// When the horoscope and the stats disagreed, who was right? Plus how the
+// team did by horoscope mood.
+function starsVsScience(completed) {
+  let stars = 0, science = 0;
+  const buckets = { doom: [0, 0], meh: [0, 0], glowing: [0, 0] };
   completed.forEach(g => {
+    const f = g.factors || {};
+    if (!f.stars) return;
     const won = g.actual === 'W';
-    const fc = g.factors || {};
-    factorNames.forEach(f => {
-      const v = fc[f];
-      if (v && v !== 0) {
-        total[f]++;
-        if ((v > 0.5) === won) correct[f]++;
-      }
-    });
+    const b = f.stars < 0.33 ? 'doom' : f.stars > 0.66 ? 'glowing' : 'meh';
+    buckets[b][won ? 0 : 1]++;
+    const others = FACTORS.map(([k]) => f[k]).filter((v, i) => FACTORS[i][0] !== 'stars' && v);
+    if (!others.length) return;
+    const sci = others.reduce((a, v) => a + v, 0) / others.length;
+    if ((f.stars > 0.5) !== (sci > 0.5)) (f.stars > 0.5) === won ? stars++ : science++;
   });
+  return { stars, science, buckets };
+}
 
-  const accuracy = factorNames.map(f => total[f] ? ((correct[f] / total[f]) * 100).toFixed(1) : 50);
+function starsVsSciencePanel(id, completed, team) {
+  const { stars, science, buckets } = starsVsScience(completed);
+  const [gw, gl] = buckets.glowing, [dw, dl] = buckets.doom;
+  let quip = 'Not enough disagreements to settle it yet.';
+  if (stars + science >= 5) {
+    quip = science > stars ? 'Science wins. The stars have been notified.' : stars > science ? 'The stars win. Science is in shambles.' : 'A dead heat. The universe shrugs.';
+  }
+  let mood = '';
+  if (gw + gl && dw + dl) {
+    const gp = gw / (gw + gl), dp = dw / (dw + dl);
+    mood = gp < dp ? `When the stars were glowing, the ${esc(team)} went <b>${gw}-${gl}</b>. Worse than when they said doom (${dw}-${dl}).`
+      : `When the stars were glowing, the ${esc(team)} went <b>${gw}-${gl}</b>. When they said doom, ${dw}-${dl}.`;
+  }
+  return `<div class="versus">
+      <div><div class="big num">${science}</div><div class="label">🔬 Science</div></div>
+      <div class="vs">vs</div>
+      <div><div class="big num">${stars}</div><div class="label">🔮 Stars</div></div>
+    </div>
+    <p class="caption">Games where the horoscope disagreed with the stats, and who called it. ${quip}</p>
+    ${canvas(id, 170)}
+    ${mood ? `<p class="caption">${mood}</p>` : ''}`;
+}
 
-  new Chart(document.getElementById('factorChart'), {
+function drawStarsBuckets(id, completed, team) {
+  const { buckets } = starsVsScience(completed);
+  const keys = [['doom', '🌑 Doom (<33%)'], ['meh', '🌗 Meh'], ['glowing', '🌕 Glowing (>66%)']];
+  chart(id, {
     type: 'bar',
     data: {
-      labels,
-      datasets: [{
-        label: 'Accuracy %',
-        data: accuracy,
-        backgroundColor: COLORS.factors.map(c => c + '55'),
-        borderColor: COLORS.factors,
-        borderWidth: 1,
-      }]
+      labels: keys.map(([, l]) => l),
+      datasets: [{ label: `${team} win %`,
+        data: keys.map(([k]) => { const [w, l] = buckets[k]; return w + l ? +((w / (w + l)) * 100).toFixed(1) : null; }),
+        backgroundColor: alpha(COLORS.primary, 0.8), borderRadius: 4, maxBarThickness: 48 }]
+    },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false },
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: {
+          label: i => { const [w, l] = buckets[keys[i.dataIndex][0]]; return `${team} ${w}-${l} (${i.raw}%)`; } } } },
+      scales: { x: { ...CHART_DEFAULTS.scales.x, grid: { display: false } },
+        y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100, title: { display: true, text: `${team} win %`, color: COLORS.textDim, font: { size: 11 } },
+          ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } }
+    }
+  });
+}
+
+function confidencePanel(id, completed) {
+  // Same thresholds as prediction.confidenceLabel (strictly greater than).
+  const bucket = g => { const d = Math.abs(g.winProbability - 0.5);
+    return d > 0.30 ? 'scream' : d > 0.20 ? 'strong' : d > 0.10 ? 'lean' : d > 0.05 ? 'nudge' : 'coin'; };
+  const groups = CONFIDENCE.map(([k, label]) => {
+    const gs = completed.filter(g => bucket(g) === k);
+    return { k, label, n: gs.length, right: gs.filter(hit).length };
+  });
+  const never = groups.filter(g => !g.n).map(g => `“${g.label}”`);
+  const maxConf = completed.length ? Math.round(Math.max(...completed.map(pickConf)) * 100) : 0;
+  const caption = completed.length
+    ? `Its boldest pick was ${maxConf}%.` + (never.length ? ` It never once said ${never.join(' or ')}.` : '')
+    : '';
+  return { html: `${canvas(id, 220)}<p class="caption">${caption}</p>`, groups };
+}
+
+function drawConfidence(id, groups) {
+  chart(id, {
+    type: 'bar',
+    data: {
+      labels: groups.map(g => g.n ? `${g.label} (${g.n})` : `${g.label} (never)`),
+      datasets: [{ label: 'Accuracy', data: groups.map(g => g.n ? +((g.right / g.n) * 100).toFixed(1) : null),
+        backgroundColor: alpha(COLORS.primary, 0.8), borderRadius: 4, barThickness: 14 }]
     },
     options: {
       ...CHART_DEFAULTS,
       indexAxis: 'y',
-      plugins: {
-        ...CHART_DEFAULTS.plugins,
-        legend: { display: false },
-        tooltip: {
-          ...CHART_DEFAULTS.plugins.tooltip,
-          callbacks: {
-            afterLabel: (item) => `${total[factorNames[item.dataIndex]]} games with data`
-          }
-        }
-      },
+      plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false },
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: {
+          label: i => { const g = groups[i.dataIndex]; return `${g.right}/${g.n} right (${i.raw}%)`; } } } },
       scales: {
-        x: {
-          ...CHART_DEFAULTS.scales.x,
-          min: 0, max: 100,
-          title: { display: true, text: '% of games where factor lean matched outcome', color: COLORS.textDim, font: { size: 11 } },
-          ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' }
-        },
-        y: { ...CHART_DEFAULTS.scales.y, grid: { display: false } }
+        x: { ...CHART_DEFAULTS.scales.x, min: 0, max: 100, ticks: { ...CHART_DEFAULTS.scales.x.ticks, callback: v => v + '%' } },
+        y: { ...CHART_DEFAULTS.scales.y, grid: { display: false }, ticks: { ...CHART_DEFAULTS.scales.y.ticks, font: { size: 10, style: 'italic' } } }
       }
     }
   });
 }
 
-function renderWeightsChart(weights) {
-  if (!weights || Object.keys(weights).length === 0) return;
+// Replays the engine's weight updates game by game. The bot only stores its
+// final weights, but the update is deterministic: this mirrors
+// prediction.CalculateFactorAccuracy + AdjustWeights.
+const WEIGHT_LIMITS = { winRate: [0.10, 0.40], pitcher: [0.10, 0.45], h2h: [0.02, 0.15], homeAway: [0.05, 0.25], momentum: [0.03, 0.20], stars: [0.03, 0.15] };
+function replayWeights(completed) {
+  let w = { ...DEFAULT_WEIGHTS };
+  const path = [];
+  completed.forEach((g, i) => {
+    const done = completed.slice(0, i + 1);
+    if (done.length >= 5) {
+      const lr = 0.15 / Math.sqrt(done.length), next = {};
+      FACTORS.forEach(([k]) => {
+        const xs = done.filter(d => (d.factors || {})[k]);
+        let c = w[k];
+        if (xs.length >= 5) {
+          const acc = xs.filter(d => (d.factors[k] > 0.5) === (d.actual === 'W')).length / xs.length;
+          c += lr * (acc - 0.5) * 2;
+        }
+        c += 0.02 * (DEFAULT_WEIGHTS[k] - c);
+        next[k] = Math.max(WEIGHT_LIMITS[k][0], Math.min(WEIGHT_LIMITS[k][1], c));
+      });
+      const t = Object.values(next).reduce((a, v) => a + v, 0);
+      FACTORS.forEach(([k]) => { next[k] /= t; });
+      w = next;
+    }
+    path.push({ date: g.date, w: { ...w } });
+  });
+  return path;
+}
 
-  const labels = ['Win Rate', 'Pitcher', 'H2H', 'Home/Away', 'Momentum', 'Stars'];
-  const keys = ['winRate', 'pitcher', 'h2h', 'homeAway', 'momentum', 'stars'];
-  const data = keys.map(k => ((weights[k] || 0) * 100).toFixed(1));
-  const mobile = window.innerWidth < 768;
+function drawTrustDrift(id, titleId, completed) {
+  const path = replayWeights(completed);
+  if (!path.length) return;
+  const starsPath = path.map(p => +(p.w.stars * 100).toFixed(1));
+  const peak = Math.max(...starsPath), low = Math.min(...starsPath), end = starsPath[starsPath.length - 1];
+  const title = document.getElementById(titleId);
+  if (title) title.textContent = `Trust in the Stars · ${Math.round(DEFAULT_WEIGHTS.stars * 100)}% → ${end.toFixed(1)}%`;
+  const datasets = FACTORS.filter(([k]) => k !== 'stars').map(([k, label], i) => ({
+    label: i === 0 ? 'Other factors' : label, factorName: label,
+    data: path.map(p => +(p.w[k] * 100).toFixed(1)),
+    borderColor: COLORS.neutral, borderWidth: 1, pointRadius: 0, tension: 0.2,
+  }));
+  datasets.unshift({ label: '🔮 Stars', factorName: 'Stars', data: starsPath, borderColor: COLORS.primary, borderWidth: 3, pointRadius: 0, tension: 0.2 });
+  chart(id, {
+    type: 'line',
+    data: { labels: path.map(p => p.date.slice(5)), datasets },
+    options: {
+      ...CHART_DEFAULTS,
+      interaction: { mode: 'index', intersect: false },
+      plugins: { ...CHART_DEFAULTS.plugins,
+        legend: { labels: { color: COLORS.textDim, font: { size: 11 }, usePointStyle: true, pointStyle: 'line', filter: item => item.datasetIndex <= 1 } },
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, itemSort: (a, b) => b.raw - a.raw,
+          callbacks: { label: i => `${i.dataset.factorName}: ${i.raw}%` } } },
+      scales: { x: { ...CHART_DEFAULTS.scales.x, ticks: { ...CHART_DEFAULTS.scales.x.ticks, maxTicksLimit: 10 } },
+        y: { ...CHART_DEFAULTS.scales.y, min: 0, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } }
+    }
+  });
+  const cap = document.getElementById(id + 'Cap');
+  if (cap) {
+    const iPeak = starsPath.indexOf(peak), iLow = starsPath.indexOf(low);
+    cap.innerHTML = `Peaked at ${peak.toFixed(1)}% (${esc(fmtDate(path[iPeak].date))}), bottomed out at ${low.toFixed(1)}% (${esc(fmtDate(path[iLow].date))}).
+      <span class="pending">Reconstructed by replaying the engine's weight updates game by game.</span>`;
+  }
+}
 
-  new Chart(document.getElementById('weightsChart'), {
+// Draws each slice's name and share on the slice itself.
+const sliceLabels = {
+  id: 'sliceLabels',
+  afterDatasetsDraw(c) {
+    const { ctx } = c;
+    const meta = c.getDatasetMeta(0);
+    ctx.save();
+    ctx.font = '600 11px system-ui, sans-serif';
+    ctx.fillStyle = '#fff';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    meta.data.forEach((arc, i) => {
+      const v = c.data.datasets[0].data[i];
+      if (v < 6) return;
+      const p = arc.tooltipPosition();
+      ctx.fillText(c.data.labels[i], p.x, p.y - 6);
+      ctx.fillText(Math.round(v) + '%', p.x, p.y + 7);
+    });
+    ctx.restore();
+  }
+};
+
+function drawWeightsPie(id, weights) {
+  if (!weights) return;
+  const mobile = isMobile();
+  chart(id, {
     type: 'doughnut',
     data: {
-      labels,
-      datasets: [{
-        data,
-        backgroundColor: COLORS.factors.map(c => c + '88'),
-        borderColor: COLORS.factors,
-        borderWidth: 1,
-      }]
+      labels: FACTORS.map(([, l]) => l),
+      datasets: [{ data: FACTORS.map(([k]) => +((weights[k] || 0) * 100).toFixed(1)),
+        backgroundColor: FACTORS.map(([k]) => FACTOR_COLORS[k]), borderColor: COLORS.surface, borderWidth: 2 }]
     },
+    plugins: [sliceLabels],
     options: {
-      responsive: true,
-      maintainAspectRatio: false,
+      responsive: true, maintainAspectRatio: false, cutout: '45%',
       plugins: {
-        legend: {
-          position: mobile ? 'bottom' : 'right',
-          labels: { color: COLORS.textDim, font: { size: mobile ? 10 : 11 }, padding: mobile ? 8 : 12 }
-        },
-        tooltip: {
-          ...CHART_DEFAULTS.plugins.tooltip,
-          callbacks: { label: (item) => `${item.label}: ${item.raw}%` }
-        }
+        legend: { position: mobile ? 'bottom' : 'right',
+          labels: { color: COLORS.textDim, font: { size: mobile ? 10 : 11 }, padding: mobile ? 8 : 12,
+            generateLabels: c => c.data.labels.map((l, i) => ({
+              text: `${l} ${Math.round(c.data.datasets[0].data[i])}% (default ${Math.round(DEFAULT_WEIGHTS[FACTORS[i][0]] * 100)}%)`,
+              fillStyle: c.data.datasets[0].backgroundColor[i], strokeStyle: COLORS.surface, fontColor: COLORS.textDim, index: i })) } },
+        tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: { label: i => `${i.label}: ${i.raw}% (default ${Math.round(DEFAULT_WEIGHTS[FACTORS[i.dataIndex][0]] * 100)}%)` } }
       }
     }
   });
 }
 
-function renderOpponentChart(completed) {
-  const opponents = {};
+function renderOpponentChart(id, completed) {
+  const opp = {};
   completed.forEach(g => {
-    if (!opponents[g.opponent]) opponents[g.opponent] = { correct: 0, wrong: 0 };
-    if (g.predicted === g.actual) opponents[g.opponent].correct++;
-    else opponents[g.opponent].wrong++;
+    opp[g.opponent] = opp[g.opponent] || { correct: 0, wrong: 0 };
+    hit(g) ? opp[g.opponent].correct++ : opp[g.opponent].wrong++;
   });
-
-  const sorted = Object.entries(opponents).sort((a, b) => (b[1].correct + b[1].wrong) - (a[1].correct + a[1].wrong));
-  const shorten = name => name.replace(/^(Los Angeles|San Diego|San Francisco|New York) /, (_, c) =>
-    ({  'Los Angeles': 'LA ', 'San Diego': 'SD ', 'San Francisco': 'SF ', 'New York': 'NY ' })[c] || c + ' ');
-  const mobile = window.innerWidth < 768;
-  const labels = sorted.map(([name]) => mobile ? shorten(name) : name);
-
-  new Chart(document.getElementById('opponentChart'), {
+  const sorted = Object.entries(opp).sort((a, b) => (b[1].correct + b[1].wrong) - (a[1].correct + a[1].wrong));
+  const gap = { borderColor: COLORS.surface, borderWidth: { top: 2 }, borderSkipped: false, borderRadius: 4, maxBarThickness: 56 };
+  chart(id, {
     type: 'bar',
     data: {
-      labels,
+      labels: sorted.map(([n]) => isMobile() ? shortTeam(n) : n),
       datasets: [
-        {
-          label: 'Correct',
-          data: sorted.map(([, v]) => v.correct),
-          backgroundColor: COLORS.green + '88',
-          borderColor: COLORS.green,
-          borderWidth: 1,
-        },
-        {
-          label: 'Wrong',
-          data: sorted.map(([, v]) => v.wrong),
-          backgroundColor: COLORS.red + '55',
-          borderColor: COLORS.red,
-          borderWidth: 1,
-        }
+        { label: '✓ Correct', data: sorted.map(([, v]) => v.correct), backgroundColor: COLORS.good, ...gap },
+        { label: '✗ Wrong', data: sorted.map(([, v]) => v.wrong), backgroundColor: COLORS.bad, ...gap },
       ]
     },
     options: {
       ...CHART_DEFAULTS,
-      plugins: {
-        ...CHART_DEFAULTS.plugins,
-        legend: { labels: { color: COLORS.textDim, font: { size: 11 } } }
-      },
+      plugins: { ...CHART_DEFAULTS.plugins, legend: { labels: { color: COLORS.textDim, font: { size: 11 } } } },
       scales: {
-        ...CHART_DEFAULTS.scales,
-        x: { ...CHART_DEFAULTS.scales.x, stacked: true },
+        x: { ...CHART_DEFAULTS.scales.x, stacked: true, grid: { display: false } },
         y: { ...CHART_DEFAULTS.scales.y, stacked: true, ticks: { ...CHART_DEFAULTS.scales.y.ticks, stepSize: 1 } }
       },
-      onClick: (e, elements) => {
-        if (elements.length > 0) {
-          filterLog(sorted[elements[0].index][0]);
-        }
-      }
+      onClick: (e, els) => { if (els.length) gameLog.filter(sorted[els[0].index][0]); }
     }
   });
 }
 
-function renderGameLog(games) {
-  const filterBar = document.getElementById('filterBar');
-  const opponents = [...new Set(games.filter(g => g.actual).map(g => g.opponent))];
-  opponents.forEach(opp => {
-    const chip = document.createElement('span');
-    chip.className = 'chip';
-    chip.dataset.filter = opp;
-    chip.textContent = opp.replace(/^(Los Angeles|San Diego|San Francisco|New York) /, (_, city) => {
-      return { 'Los Angeles': 'LA ', 'San Diego': 'SD ', 'San Francisco': 'SF ', 'New York': 'NY ' }[city] || city + ' ';
+// One square per game: fill says whether the bot was right, the letter is the
+// result. Backfilled games (before the bot was running) are neutral.
+function seasonCalendar(games) {
+  const byMonth = {};
+  games.filter(g => g.actual).forEach(g => { (byMonth[g.date.slice(0, 7)] = byMonth[g.date.slice(0, 7)] || []).push(g); });
+  const months = Object.keys(byMonth).sort();
+  if (!months.length) return '<div class="empty">No finished games yet.</div>';
+  const rows = months.map(m => {
+    const cells = byMonth[m].map(g => {
+      const cls = g.synthetic ? 'cal-syn' : hit(g) ? 'cal-hit' : 'cal-miss';
+      const what = g.synthetic ? 'no prediction (backfilled)' : `said ${g.predicted} at ${Math.round(pickConf(g) * 100)}%, ${hit(g) ? '✓ right' : '✗ wrong'}`;
+      const tip = `${g.date} ${g.isHome ? 'vs' : '@'} ${g.opponent}: ${g.actual} ${g.teamScore}-${g.oppScore} · ${what}`;
+      const inner = `<span class="${cls}" title="${esc(tip)}" aria-label="${esc(tip)}">${esc(g.actual)}</span>`;
+      return g.postUrl ? `<a href="${esc(g.postUrl)}" target="_blank" rel="noopener">${inner}</a>` : inner;
+    }).join('');
+    return `<div class="cal-row"><div class="cal-month">${esc(fmtDate(m + '-01', { month: 'short' }))}</div><div class="cal-cells">${cells}</div></div>`;
+  }).join('');
+  return `<div class="calendar">${rows}</div>
+    <div class="cal-legend"><span class="cal-hit">W</span> bot right <span class="cal-miss">W</span> bot wrong
+      <span class="cal-syn">W</span> before the bot · letter = result · hover for details, click for the post</div>`;
+}
+
+function highlightsPanel(games, { title, summary, baseline = 'pessimist', team = 'Rockies' }) {
+  const done = completedOf(games);
+  if (!done.length) return '';
+  const top = (xs, key) => xs.slice().sort((a, b) => key(b) - key(a))[0];
+  const upset = top(done.filter(g => g.predicted === 'L' && g.actual === 'W'), pickConf);
+  const whiff = top(done.filter(g => g.predicted === 'W' && g.actual === 'L'), pickConf);
+  const called = top(done.filter(g => g.predicted === 'L' && g.actual === 'L'), g => g.oppScore - g.teamScore);
+  let streak = 0, best = 0, bestEnd = null;
+  done.forEach(g => { streak = hit(g) ? streak + 1 : 0; if (streak > best) { best = streak; bestEnd = g.date; } });
+  const right = done.filter(hit).length;
+  const baseRight = baseline === 'pessimist' ? done.filter(g => g.actual === 'L').length : done.length / 2;
+  const diff = right - baseRight;
+  const game = g => `${esc(fmtDate(g.date))} ${g.isHome ? 'vs' : '@'} ${esc(nickname(g.opponent))}`;
+  const item = (emoji, k, body) => body ? `<div class="item"><div class="k">${emoji} ${k}</div>${body}</div>` : '';
+  const rival = baseline === 'pessimist' ? '“always pick L”' : 'a coin flip';
+
+  return `<div class="grid" style="margin-bottom:16px">${panel(title, `<div class="report">
+    ${item('🔮', 'Verdict', `${right}/${done.length} right (${pct(right, done.length)}). ${diff < 0
+      ? `${rival} would have gone ${Number.isInteger(baseRight) ? baseRight : baseRight.toFixed(1)}/${done.length}. Pessimism wins by ${Math.abs(diff)}.`
+      : diff > 0 ? `That beats ${rival} by ${diff}.` : `Exactly tied with ${rival}.`}`)}
+    ${upset ? item('🎆', 'Biggest upset', `${game(upset)}. Said L at ${Math.round(pickConf(upset) * 100)}%, then the ${esc(team)} won ${upset.teamScore}-${upset.oppScore}.`) : ''}
+    ${whiff ? item('🤦', 'Worst whiff', `${game(whiff)}. Said W at ${Math.round(pickConf(whiff) * 100)}%, lost ${whiff.teamScore}-${whiff.oppScore}.`) : ''}
+    ${called ? item('🎯', 'Called it', `${game(called)}. Said L, and it was ${called.teamScore}-${called.oppScore}.`) : ''}
+    ${best > 1 ? item('🔥', 'Longest correct streak', `${best} straight, ending ${esc(fmtDate(bestEnd))}.`) : ''}
+    ${summary && summary.factorSamples && summary.factorSamples.stars ? item('⭐', 'The stars',
+      `Leaned the right way ${Math.round(summary.factorAccuracy.stars * 100)}% of the time.`) : ''}
+  </div>`, { wide: true })}</div>`;
+}
+
+// ── game log ─────────────────────────────────────────────────────────
+
+const PAGE_SIZE = 20;
+const gameLog = {
+  games: [], filtered: [], page: 1, active: 'all', opts: {},
+
+  html(title = 'Game Log') {
+    return `<div class="game-log panel" style="margin-top:0">
+      <h2>${title}</h2>
+      <div class="filter-bar" id="filterBar"></div>
+      <div class="table-scroll"><table><thead id="logHead"></thead><tbody id="logBody"></tbody></table></div>
+      <div class="pagination" id="pagination"></div>
+    </div>`;
+  },
+
+  mount(games, opts = {}) {
+    this.games = games; this.opts = opts; this.page = 1;
+    const opponents = [...new Set(games.filter(g => g.actual).map(g => g.opponent))];
+    const bar = document.getElementById('filterBar');
+    bar.innerHTML = `<span class="chip active" data-filter="all">All</span>` +
+      opponents.map(o => `<span class="chip" data-filter="${esc(o)}">${esc(shortTeam(o))}</span>`).join('');
+    bar.querySelectorAll('.chip').forEach(c => c.onclick = () => this.filter(c.dataset.filter));
+    const cols = ['Date', ...(opts.series ? ['Series'] : []), ...(opts.team ? ['Team'] : []), 'Opponent', 'H/A', 'Predicted', 'Actual', 'Score', 'Win Prob', 'Result', ''];
+    document.getElementById('logHead').innerHTML = `<tr>${cols.map(c => `<th>${c}</th>`).join('')}</tr>`;
+    this.filter('all');
+  },
+
+  filter(f) {
+    if (!document.getElementById('logBody')) return;
+    this.active = f; this.page = 1;
+    document.querySelectorAll('#filterBar .chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+    this.filtered = (f === 'all' ? this.games.slice() : this.games.filter(g => g.opponent === f)).reverse();
+    this.render();
+  },
+
+  go(p) {
+    const pages = Math.ceil(this.filtered.length / PAGE_SIZE);
+    if (p < 1 || p > pages) return;
+    this.page = p; this.render();
+  },
+
+  render() {
+    const body = document.getElementById('logBody');
+    if (!body) return;
+    const pages = Math.max(1, Math.ceil(this.filtered.length / PAGE_SIZE));
+    this.page = Math.min(this.page, pages);
+    const rows = this.filtered.slice((this.page - 1) * PAGE_SIZE, this.page * PAGE_SIZE);
+    const m = isMobile();
+
+    body.innerHTML = rows.length ? rows.map(g => {
+      const done = g.actual && !g.synthetic, ok = done && g.predicted === g.actual;
+      const resultClass = g.synthetic ? 'pending' : !done ? 'pending' : ok ? 'correct' : 'wrong';
+      const resultText = g.synthetic ? 'backfill' : !done ? 'Pending' : ok ? '✓ Correct' : '✗ Wrong';
+      const tag = v => v === 'W' ? 'tag-w' : v === 'L' ? 'tag-l' : 'tag-na';
+      const score = (g.teamScore || g.oppScore) ? `${g.teamScore}-${g.oppScore}` : '—';
+      return `<tr>
+        <td>${esc(m ? g.date.slice(5) : g.date)}</td>
+        ${this.opts.series ? `<td title="${esc(g.seriesResult)}">${esc(m ? String(g.series || '—').replace(' Game ', ' G') : (g.series || '—'))}</td>` : ''}
+        ${this.opts.team ? `<td>${esc(teamName(g.team))}</td>` : ''}
+        <td>${esc(teamName(g.opponent))}</td>
+        <td>${m ? (g.isHome ? 'H' : 'A') : (g.isHome ? 'Home' : 'Away')}</td>
+        <td><span class="tag ${g.synthetic ? 'tag-na' : tag(g.predicted)}">${g.synthetic ? '—' : esc(g.predicted)}</span></td>
+        <td><span class="tag ${tag(g.actual)}">${esc(g.actual || '—')}</span></td>
+        <td class="num">${score}</td>
+        <td class="num">${g.synthetic ? '—' : Math.round(g.winProbability * 100) + '%'}</td>
+        <td class="${resultClass}">${resultText}</td>
+        <td>${postLink(g.postUrl, '🔗')}</td>
+      </tr>`;
+    }).join('') : `<tr><td colspan="12" class="pending" style="text-align:center;padding:24px">No games yet.</td></tr>`;
+
+    const pag = document.getElementById('pagination');
+    if (pages <= 1) { pag.innerHTML = ''; return; }
+    let html = `<button onclick="gameLog.go(${this.page - 1})" ${this.page === 1 ? 'disabled' : ''}>&lsaquo;</button>`;
+    for (let p = 1; p <= pages; p++) html += `<button class="${p === this.page ? 'active' : ''}" onclick="gameLog.go(${p})">${p}</button>`;
+    html += `<button onclick="gameLog.go(${this.page + 1})" ${this.page === pages ? 'disabled' : ''}>&rsaquo;</button>`;
+    html += `<span class="page-info">${this.filtered.length} games</span>`;
+    pag.innerHTML = html;
+  },
+};
+
+// ── views ────────────────────────────────────────────────────────────
+
+// The analysis grid shared by every prediction phase.
+function analysisHTML(prefix, { calendar, games, weights, baseline, team }) {
+  if (!completedOf(games).length) {
+    return `<div class="grid">${panel('📊 Analysis', '<div class="empty"><span class="big">⏳</span>Charts appear once the first predicted game is final.</div>', { wide: true })}</div>`;
+  }
+  return `${calendar ? `<div class="grid">${panel('🗓️ The Season, Game by Game', seasonCalendar(games), { wide: true })}</div>` : ''}
+  <div class="grid">
+    ${panel('', canvas(prefix + 'Race', 260), { wide: true, id: prefix + 'RaceTitle' })}
+    ${panel('🔬 Stars vs. Science', starsVsSciencePanel(prefix + 'Stars', completedOf(games), team))}
+    ${panel('📣 Confidence Is Decorative', confidencePanel(prefix + 'Conf', completedOf(games)).html)}
+    ${weights ? panel('', canvas(prefix + 'Drift', 240) + `<p class="caption" id="${prefix}DriftCap"></p>`, { id: prefix + 'DriftTitle' }) : ''}
+    ${weights ? panel(weights.title, canvas(prefix + 'Pie', 260)) : ''}
+    ${panel('Record by Opponent', canvas(prefix + 'Opp'), { wide: true })}
+  </div>`;
+}
+function drawAnalysis(prefix, { games, weights, baseline, team }) {
+  const done = completedOf(games);
+  if (!done.length) return;
+  renderRaceChart(prefix + 'Race', prefix + 'RaceTitle', done, baseline);
+  drawStarsBuckets(prefix + 'Stars', done, team);
+  drawConfidence(prefix + 'Conf', confidencePanel(prefix + 'Conf', done).groups);
+  if (weights) {
+    drawTrustDrift(prefix + 'Drift', prefix + 'DriftTitle', done);
+    drawWeightsPie(prefix + 'Pie', weights.values);
+  }
+  renderOpponentChart(prefix + 'Opp', done);
+}
+
+function renderRegular(main, d) {
+  const games = d.regular;
+  const completed = games.filter(g => g.actual);
+  const real = completedOf(games);
+  const correct = real.filter(hit).length;
+  const wins = completed.filter(g => g.actual === 'W').length, losses = completed.length - wins;
+  const acc = baseballPct(correct, real.length, 'Accuracy');
+  const vsPessimist = correct - real.filter(g => g.actual === 'L').length;
+  const finished = !d.live || (d.phase && d.phase !== 'regular-season');
+  const weights = d.weights ? { values: d.weights, title: finished ? 'Final Factor Weights' : 'Current Factor Weights' } : null;
+
+  main.innerHTML = statCards([
+    { value: `${correct}-${real.length - correct}`, label: 'Prediction Record' },
+    { value: acc.value, label: acc.label },
+    { value: `${wins}-${losses}`, label: 'Rockies Record' },
+    { value: signed(vsPessimist), label: vsPessimist < 0 ? 'Games behind “always pick L”' : 'Games ahead of “always pick L”' },
+  ]) + highlightsPanel(games, { title: finished ? `📜 ${d.season} Report Card` : '🌠 Cosmic Highlights (so far)', summary: d.summary })
+    + analysisHTML('reg', { calendar: true, games, weights, team: 'Rockies' })
+    + gameLog.html();
+  drawAnalysis('reg', { games, weights, baseline: 'pessimist', team: 'Rockies' });
+  gameLog.mount(games);
+}
+
+function renderPostseason(main, d) {
+  const ps = d.postseason;
+  const games = ps.games;
+  const real = completedOf(games);
+  const correct = real.filter(hit).length;
+  const wins = real.filter(g => g.actual === 'W').length;
+  const acc = baseballPct(correct, real.length, 'Accuracy');
+  const champ = ps.champion;
+
+  const cards = ps.adoptions.map((a, i) => {
+    const isChamp = champ && a.teamName === champ;
+    const current = !a.eliminatedOn && !champ && i === ps.adoptions.length - 1;
+    const fate = isChamp ? `<div class="fate won">🏆 World Series champions</div>`
+      : a.eliminatedOn ? `<div class="fate out">🪦 Eliminated ${esc(fmtDate(a.eliminatedOn))}</div>`
+      : champ ? `<div class="fate out">🪦 Eliminated</div>`
+      : `<div class="fate alive">● Still alive</div>`;
+    const r = a.reading || {};
+    return `<div class="adopt-card${isChamp ? ' champ' : current ? ' current' : ''}">
+      <div class="team">${i === 0 ? '🍼' : '🔁'} ${esc(a.teamName)}</div>
+      <div class="when">Adopted ${esc(fmtDate(a.adoptedOn))}</div>
+      <div class="reading">🌊 ${Math.round((r.waterShare || 0) * 100)}% water signs<br>
+        ♋ Compatibility ${(r.score || 0).toFixed(1)}/3<br>
+        ${SIGN_EMOJI[r.dominant] || '✨'} Dominant sign: ${esc(r.dominant || '?')}</div>
+      ${fate}
+    </div>`;
+  }).join('');
+  const champCard = champ && !ps.adoptions.some(a => a.teamName === champ)
+    ? `<div class="adopt-card champ"><div class="team">🏆 ${esc(champ)}</div><div class="when">${esc(fmtDate(ps.championDate))}</div>
+       <div class="reading">Won it all without our blessing.</div></div>` : '';
+
+  main.innerHTML = statCards([
+    { value: `${correct}-${real.length - correct}`, label: 'Postseason Picks' },
+    { value: acc.value, label: acc.label },
+    { value: `${wins}-${real.length - wins}`, label: 'Adopted Teams in Picked Games' },
+    { value: ps.adoptions.length, label: ps.adoptions.length === 1 ? 'Team Adopted' : 'Teams Adopted' },
+  ]) + `<div class="grid">
+      ${panel('🍼 Adoption Agency', ps.adoptions.length || champCard ? `<div class="adoptions">${cards}${champCard}</div>`
+        : '<div class="empty">No adoptions yet.</div>', { wide: true })}
+      ${ps.audits.length ? panel('🔭 Playoff Birth-Chart Audit', canvas('psAudit', Math.max(160, ps.audits.length * 34), { keep: true }), { wide: true }) : ''}
+    </div>`
+    + highlightsPanel(games, { title: '🌠 October Highlights', baseline: 'coin', team: 'adopted team' })
+    + analysisHTML('ps', { games, team: 'adopted team' })
+    + gameLog.html('Adopted Team Game Log');
+
+  if (ps.audits.length) {
+    const audits = ps.audits;
+    chart('psAudit', {
+      type: 'bar',
+      data: {
+        labels: audits.map(a => (a.adopted ? '🍼 ' : '') + (isMobile() ? shortTeam(a.team) : a.team)),
+        datasets: [{
+          label: 'Cancer compatibility',
+          data: audits.map(a => +a.reading.score.toFixed(2)),
+          backgroundColor: audits.map(a => a.adopted ? COLORS.primary : COLORS.neutral),
+          borderRadius: 4, barThickness: 14,
+        }]
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        indexAxis: 'y',
+        plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false },
+          tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: {
+            label: i => `Compatibility ${i.raw}/3`,
+            afterLabel: i => { const r = audits[i.dataIndex].reading;
+              return `${Math.round(r.waterShare * 100)}% water signs · mostly ${r.dominant} · ${r.players} players${audits[i.dataIndex].adopted ? '\n🍼 Adopted' : ''}`; } } } },
+        scales: {
+          x: { ...CHART_DEFAULTS.scales.x, min: 0, max: 3, title: { display: true, text: 'Mean Cancer compatibility (0 = mismatch, 3 = soulmates)', color: COLORS.textDim, font: { size: 11 } } },
+          y: { ...CHART_DEFAULTS.scales.y, grid: { display: false } }
+        }
+      }
     });
-    chip.onclick = () => filterLog(opp);
-    filterBar.appendChild(chip);
-  });
-
-  document.querySelector('[data-filter="all"]').onclick = () => filterLog('all');
-  filterLog('all');
+  }
+  drawAnalysis('ps', { games, baseline: 'coin', team: 'adopted team' });
+  gameLog.mount(games, { series: true, team: true });
 }
 
-function filterLog(filter) {
-  activeFilter = filter;
-  currentPage = 1;
-  document.querySelectorAll('.filter-bar .chip').forEach(c => {
-    c.classList.toggle('active', c.dataset.filter === filter);
-  });
-  filteredGames = filter === 'all' ? allGames.slice() : allGames.filter(g => g.opponent === filter);
-  filteredGames.reverse();
-  renderPage();
+function renderSpring(main, d) {
+  const games = d.spring;
+  const real = completedOf(games);
+  const correct = real.filter(hit).length;
+  const wins = real.filter(g => g.actual === 'W').length;
+  const acc = baseballPct(correct, real.length, 'Accuracy');
+  const win = baseballPct(wins, real.length, 'Spring Win %');
+
+  main.innerHTML = statCards([
+    { value: `${correct}-${real.length - correct}`, label: 'Spring Picks' },
+    { value: acc.value, label: acc.label },
+    { value: `${wins}-${real.length - wins}`, label: 'Rockies Spring Record' },
+    { value: win.value, label: win.label },
+  ]) + `<p class="note">🌵 Spring games don't count. Neither do these picks. They never touch the regular-season model.</p>`
+    + highlightsPanel(games, { title: '🌠 Spring Highlights', baseline: 'coin' })
+    + analysisHTML('sp', { calendar: true, games, team: 'Rockies' })
+    + gameLog.html('Spring Game Log');
+  drawAnalysis('sp', { games, baseline: 'coin', team: 'Rockies' });
+  gameLog.mount(games);
 }
 
-function renderPage() {
-  const totalPages = Math.max(1, Math.ceil(filteredGames.length / PAGE_SIZE));
-  if (currentPage > totalPages) currentPage = totalPages;
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const page = filteredGames.slice(start, start + PAGE_SIZE);
+function renderHotStove(main, d) {
+  const moves = d.hotStove;
+  const arrivals = moves.filter(m => m.arriving).length;
+  const signCounts = {};
+  moves.forEach(m => { if (m.sign) signCounts[m.sign] = (signCounts[m.sign] || 0) + 1; });
+  const topSign = Object.entries(signCounts).sort((a, b) => b[1] - a[1])[0];
+  const cd = d.live ? app.status?.countdown : null;
 
-  const tbody = document.getElementById('logBody');
-  tbody.innerHTML = page.map(g => {
-    const isCorrect = !g.synthetic && g.actual && g.predicted === g.actual;
-    const isWrong = !g.synthetic && g.actual && g.predicted !== g.actual;
-    const resultClass = g.synthetic ? 'pending' : isCorrect ? 'correct' : isWrong ? 'wrong' : 'pending';
-    const resultText = g.synthetic ? 'backfill' : isCorrect ? 'Correct' : isWrong ? 'Wrong' : '—';
+  const feed = moves.length ? `<ul class="feed">${moves.map(m => `<li>
+      <span class="icon">${TXN_EMOJI[m.typeCode] || '📋'}</span>
+      <div class="body">${esc(m.description)}
+        <div class="meta">${esc(fmtDate(m.date))}
+          ${m.sign ? ` · ${m.signEmoji || ''} ${esc(m.sign)}` : ''}
+          ${m.compatibilityLabel ? ` · ♋ ${esc(m.compatibilityLabel)}` : !m.arriving ? ' · no longer our problem' : ''}
+          ${m.digest ? ' · in a roundup' : ''}</div>
+      </div>${postLink(m.postUrl)}</li>`).join('')}</ul>`
+    : '<div class="empty"><span class="big">🧊</span>No roster moves yet. The front office is, as ever, deliberating.</div>';
 
-    const predTag = g.synthetic ? 'tag-na' : g.predicted === 'W' ? 'tag-w' : g.predicted === 'L' ? 'tag-l' : 'tag-na';
-    const predText = g.synthetic ? '—' : g.predicted;
-    const actTag = g.actual === 'W' ? 'tag-w' : g.actual === 'L' ? 'tag-l' : 'tag-na';
-    const winProb = g.synthetic ? '—' : `${(g.winProbability * 100).toFixed(0)}%`;
+  main.innerHTML = statCards([
+    ...(cd ? [{ value: cd.days, label: `Days to Opening Day (${fmtDate(cd.openingDay)})` }] : []),
+    { value: moves.length, label: 'Moves Posted' },
+    { value: `${arrivals} / ${moves.length - arrivals}`, label: 'Arrivals / Departures' },
+    { value: topSign ? `${SIGN_EMOJI[topSign[0]]} ${topSign[0]}` : '—', label: 'Most Common Sign' },
+  ]) + `<div class="grid">
+      ${panel('🔥 Hot Stove Feed', feed, { wide: !Object.keys(signCounts).length })}
+      ${Object.keys(signCounts).length ? panel('♋ Signs on the Move', canvas('hsSigns', 340, { keep: true })) : ''}
+    </div>`;
 
-    const date = isMobile() ? g.date.slice(5) : g.date;
-    const opp = teamName(g.opponent);
-    const ha = isMobile() ? (g.isHome ? 'H' : 'A') : (g.isHome ? 'Home' : 'Away');
+  if (Object.keys(signCounts).length) {
+    const count = (sign, arriving) => moves.filter(m => m.sign === sign && m.arriving === arriving).length;
+    const gap = { borderColor: COLORS.surface, borderWidth: { top: 2 }, borderSkipped: false, borderRadius: 4, maxBarThickness: 16 };
+    chart('hsSigns', {
+      type: 'bar',
+      data: {
+        labels: SIGNS.map(s => `${SIGN_EMOJI[s]} ${isMobile() ? s.slice(0, 3) : s}`),
+        datasets: [
+          { label: 'Arriving', data: SIGNS.map(s => count(s, true)), backgroundColor: COLORS.primary, ...gap },
+          { label: 'Departing', data: SIGNS.map(s => count(s, false)), backgroundColor: COLORS.secondary, ...gap },
+        ]
+      },
+      options: {
+        ...CHART_DEFAULTS,
+        indexAxis: 'y',
+        plugins: { ...CHART_DEFAULTS.plugins, legend: { labels: { color: COLORS.textDim, font: { size: 11 } } } },
+        scales: {
+          x: { ...CHART_DEFAULTS.scales.x, stacked: true, ticks: { ...CHART_DEFAULTS.scales.x.ticks, stepSize: 1 } },
+          y: { ...CHART_DEFAULTS.scales.y, stacked: true, grid: { display: false } }
+        }
+      }
+    });
+  }
+}
 
-    return `<tr>
-      <td>${date}</td>
-      <td>${opp}</td>
-      <td>${ha}</td>
-      <td><span class="tag ${predTag}">${predText}</span></td>
-      <td><span class="tag ${actTag}">${g.actual || '—'}</span></td>
-      <td>${winProb}</td>
-      <td class="${resultClass}">${resultText}</td>
+function renderAllTime(main) {
+  const seasons = app.seasons.slice().sort((a, b) => a.season - b.season);
+  const withPreds = seasons.filter(s => s.summary && s.summary.predictions);
+  const totC = withPreds.reduce((a, s) => a + s.summary.correct, 0);
+  const totP = withPreds.reduce((a, s) => a + s.summary.predictions, 0);
+  const best = withPreds.slice().sort((a, b) => b.summary.correct / b.summary.predictions - a.summary.correct / a.summary.predictions)[0];
+  const psC = seasons.reduce((a, s) => a + (s.postseason ? s.postseason.correct : 0), 0);
+  const psP = seasons.reduce((a, s) => a + (s.postseason ? s.postseason.picks : 0), 0);
+
+  const rows = seasons.slice().reverse().map(s => {
+    const sm = s.summary;
+    const ps = s.postseason;
+    return `<tr class="clickable" onclick="go(${s.season})">
+      <td><b>${s.season}</b>${s.live ? ' <span class="live-dot" style="display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green)"></span>' : ''}</td>
+      <td class="num">${sm ? `${sm.rockiesWins}-${sm.rockiesLosses}` : '—'}</td>
+      <td class="num">${sm && sm.predictions ? `${sm.correct}/${sm.predictions} (${pct(sm.correct, sm.predictions)})` : '—'}</td>
+      <td>${ps && ps.adopted ? ps.adopted.map(t => esc(nickname(t))).join(' → ') : '—'}</td>
+      <td class="num">${ps && ps.picks ? `${ps.correct}/${ps.picks}` : '—'}</td>
+      <td class="num">${s.spring && s.spring.picks ? `${s.spring.correct}/${s.spring.picks}` : '—'}</td>
+      <td class="num">${s.hotStoveMoves || '—'}</td>
+      <td>${s.champion ? '🏆 ' + esc(nickname(s.champion)) : '—'}</td>
     </tr>`;
   }).join('');
 
-  const pag = document.getElementById('pagination');
-  if (totalPages <= 1) { pag.innerHTML = ''; return; }
+  const weightRows = withPreds.slice().reverse().map(s => `<tr>
+      <td><b>${s.season}</b></td>
+      ${FACTORS.map(([k]) => `<td class="num">${Math.round((s.summary.finalWeights[k] || 0) * 100)}%</td>`).join('')}
+    </tr>`).join('');
 
-  let html = `<button onclick="goPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>&lsaquo;</button>`;
-  for (let p = 1; p <= totalPages; p++) {
-    html += `<button class="${p === currentPage ? 'active' : ''}" onclick="goPage(${p})">${p}</button>`;
+  main.innerHTML = statCards([
+    { value: seasons.length, label: 'Seasons Tracked' },
+    { value: `${totC}/${totP}`, label: `All-time Predictions (${pct(totC, totP)})` },
+    { value: best ? best.season : '—', label: best ? `Best Season (${pct(best.summary.correct, best.summary.predictions)})` : 'Best Season' },
+    { value: psP ? `${psC}/${psP}` : '—', label: 'All-time Postseason Picks' },
+  ]) + `<div class="grid">
+      ${panel('Prediction Accuracy by Season', canvas('atAcc'))}
+      ${panel('Rockies Win % by Season', canvas('atWin'))}
+    </div>
+    <div class="game-log panel" style="margin-bottom:20px"><h2>Season by Season</h2><div class="table-scroll"><table>
+      <thead><tr><th>Season</th><th>Rockies</th><th>Predictions</th><th>Adopted</th><th>Postseason Picks</th><th>Spring Picks</th><th>Hot Stove</th><th>Champion</th></tr></thead>
+      <tbody>${rows}</tbody></table></div></div>
+    ${weightRows ? `<div class="game-log panel"><h2>🧠 Final Weights by Season</h2><div class="table-scroll"><table>
+      <thead><tr><th>Season</th>${FACTORS.map(([, l]) => `<th>${l}</th>`).join('')}</tr></thead>
+      <tbody>${weightRows}<tr><td class="pending">default</td>${FACTORS.map(([k]) => `<td class="num pending">${Math.round(DEFAULT_WEIGHTS[k] * 100)}%</td>`).join('')}</tr></tbody>
+      </table></div></div>` : ''}`;
+
+  const bars = (id, label, values, color, tooltip) => chart(id, {
+    type: 'bar',
+    data: { labels: seasons.map(s => s.season), datasets: [{ label, data: values, backgroundColor: color, borderRadius: 4, maxBarThickness: 48 }] },
+    options: {
+      ...CHART_DEFAULTS,
+      plugins: { ...CHART_DEFAULTS.plugins, legend: { display: false }, tooltip: { ...CHART_DEFAULTS.plugins.tooltip, callbacks: { label: tooltip } } },
+      scales: { x: { ...CHART_DEFAULTS.scales.x, grid: { display: false } },
+        y: { ...CHART_DEFAULTS.scales.y, min: 0, max: 100, ticks: { ...CHART_DEFAULTS.scales.y.ticks, callback: v => v + '%' } } }
+    }
+  });
+  bars('atAcc', 'Accuracy', seasons.map(s => s.summary && s.summary.predictions ? +(s.summary.correct / s.summary.predictions * 100).toFixed(1) : null),
+    COLORS.primary, i => { const s = seasons[i.dataIndex].summary; return `${i.raw}% (${s.correct}/${s.predictions})`; });
+  bars('atWin', 'Win %', seasons.map(s => s.summary && (s.summary.rockiesWins + s.summary.rockiesLosses) ? +(s.summary.rockiesWins / (s.summary.rockiesWins + s.summary.rockiesLosses) * 100).toFixed(1) : null),
+    COLORS.secondary, i => { const s = seasons[i.dataIndex].summary; return `${i.raw}% (${s.rockiesWins}-${s.rockiesLosses})`; });
+}
+
+// ── boot ─────────────────────────────────────────────────────────────
+
+async function init() {
+  try {
+    [app.status, app.seasons] = await Promise.all([getJSON('/api/status'), getJSON('/api/seasons')]);
+  } catch (e) {
+    document.getElementById('view').innerHTML = emptyState('🌑', `The dashboard couldn't reach the bot: ${esc(e.message)}`);
+    return;
   }
-  html += `<button onclick="goPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>&rsaquo;</button>`;
-  html += `<span class="page-info">${filteredGames.length} games</span>`;
-  pag.innerHTML = html;
+  renderBanner(app.status);
+  window.addEventListener('hashchange', route);
+  route();
 }
 
-function goPage(p) {
-  const totalPages = Math.ceil(filteredGames.length / PAGE_SIZE);
-  if (p < 1 || p > totalPages) return;
-  currentPage = p;
-  renderPage();
-}
-
+let lastMobile = isMobile();
+window.addEventListener('resize', () => {
+  if (isMobile() !== lastMobile) { lastMobile = isMobile(); route(); }
+  else gameLog.render();
+});
 init();
-window.addEventListener('resize', () => { if (filteredGames.length) renderPage(); });
 </script>
 </body>
 </html>

@@ -5,8 +5,10 @@ import (
 	"sort"
 	"strings"
 
+	"github.com/tlugger/rockiscope/internal/astro"
 	"github.com/tlugger/rockiscope/internal/formatter"
 	"github.com/tlugger/rockiscope/internal/mlb"
+	"github.com/tlugger/rockiscope/internal/seasonstate"
 )
 
 // Transaction checks happen at these Denver hours.
@@ -38,7 +40,7 @@ func isArriving(t mlb.Transaction) bool {
 
 // hotStoveTask posts new Rockies roster moves, twice a day, and stays silent
 // when nothing happens.
-func (s *Scheduler) hotStoveTask(r *tickResult) {
+func (s *Scheduler) hotStoveTask(season int, r *tickResult) {
 	st := s.state()
 	today := s.today()
 	if st.HotStoveSince == "" {
@@ -111,7 +113,7 @@ func (s *Scheduler) hotStoveTask(r *tickResult) {
 
 	if len(fresh) > 0 {
 		s.logger.Printf("hot stove: %d new Rockies moves", len(fresh))
-		if !s.postTransactions(fresh, today, slot, r) {
+		if !s.postTransactions(season, fresh, today, slot, r) {
 			return
 		}
 	}
@@ -120,7 +122,7 @@ func (s *Scheduler) hotStoveTask(r *tickResult) {
 
 // postTransactions posts the first few moves individually and rolls the rest
 // into a digest. It returns false if anything failed (to retry later).
-func (s *Scheduler) postTransactions(fresh []mlb.Transaction, today string, slot int, r *tickResult) bool {
+func (s *Scheduler) postTransactions(season int, fresh []mlb.Transaction, today string, slot int, r *tickResult) bool {
 	st := s.state()
 	birthDates := map[int]string{}
 	var ids []int
@@ -152,24 +154,49 @@ func (s *Scheduler) postTransactions(fresh []mlb.Transaction, today string, slot
 			BirthDate:   birthDates[t.PersonID],
 			Arriving:    isArriving(t),
 		})
-		if _, err := s.postOnce(fmt.Sprintf("txn:%d", t.ID), text, nil, "", ""); err != nil {
+		uri, err := s.postOnce(fmt.Sprintf("txn:%d", t.ID), text, nil, "", "")
+		if err != nil {
 			r.fail("transaction post", err)
 			return false
 		}
 		st.TxnSeen[fmt.Sprint(t.ID)] = t.Date
+		s.logHotStove(season, t, birthDates[t.PersonID], uri, false)
 		s.saveSeasonState()
 	}
 
 	if len(digest) > 0 {
 		key := fmt.Sprintf("txn-digest:%s:%d", today, slot)
-		if _, err := s.postOnce(key, formatter.FormatTransactionDigest(digest), nil, "", ""); err != nil {
+		uri, err := s.postOnce(key, formatter.FormatTransactionDigest(digest), nil, "", "")
+		if err != nil {
 			r.fail("transaction digest", err)
 			return false
 		}
 		for _, t := range digestIDs {
 			st.TxnSeen[fmt.Sprint(t.ID)] = t.Date
+			s.logHotStove(season, t, "", uri, true)
 		}
 		s.saveSeasonState()
 	}
 	return true
+}
+
+// logHotStove keeps a permanent record of each posted move for the dashboard.
+// Unlike TxnSeen it is never pruned (a busy winter is ~50 entries).
+func (s *Scheduler) logHotStove(season int, t mlb.Transaction, birthDate, uri string, digest bool) {
+	st := s.state()
+	for _, e := range st.HotStove {
+		if e.ID == t.ID {
+			return
+		}
+	}
+	e := seasonstate.HotStoveEntry{
+		Season: season, Date: t.Date, ID: t.ID, TypeCode: t.TypeCode, TypeDesc: t.TypeDesc,
+		Description: t.Description, Player: t.PersonName, Arriving: isArriving(t),
+		Compatibility: -1, PostURI: uri, Digest: digest,
+	}
+	if sign, ok := astro.SignFor(birthDate); ok {
+		e.Sign = sign.Name()
+		e.Compatibility = sign.Compatibility()
+	}
+	st.HotStove = append(st.HotStove, e)
 }

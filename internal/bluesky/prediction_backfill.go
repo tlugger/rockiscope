@@ -179,24 +179,25 @@ func backfillFromFeed(hist *prediction.PredictionHistory, items []AuthorFeedItem
 		}
 	}
 
-	// Index existing records by gamePk for upsert.
-	byGamePk := make(map[int]*prediction.PredictionRecord)
-	for i := range hist.Predictions {
-		p := &hist.Predictions[i]
+	// Index existing records by gamePk for upsert. Indices, not pointers:
+	// appending a record can reallocate the slice and orphan earlier pointers.
+	byGamePk := make(map[int]int)
+	for i, p := range hist.Predictions {
 		if p.GamePK != 0 {
-			byGamePk[p.GamePK] = p
+			byGamePk[p.GamePK] = i
 		}
 	}
 
 	var updated int
 	for pk, m := range byGame {
 		g := m.game
-		rec := byGamePk[pk]
-		if rec == nil {
+		i, ok := byGamePk[pk]
+		if !ok {
 			hist.Predictions = append(hist.Predictions, prediction.PredictionRecord{GamePK: pk})
-			rec = &hist.Predictions[len(hist.Predictions)-1]
-			byGamePk[pk] = rec
+			i = len(hist.Predictions) - 1
+			byGamePk[pk] = i
 		}
+		rec := &hist.Predictions[i]
 
 		rec.Date = g.Date
 		rec.Opponent = g.Opponent

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/tlugger/rockiscope/internal/mlb"
+	"github.com/tlugger/rockiscope/internal/seasonstate"
 )
 
 // Phase is where we are in the baseball calendar.
@@ -53,6 +54,19 @@ func classifyPhase(today string, year int, thisYear, nextYear *mlb.SeasonDates, 
 	default:
 		return PhaseInfo{Phase: PhaseOffseason, Season: year, Upcoming: nextYear}
 	}
+}
+
+// recordStatus saves the phase for the dashboard, only when it changes.
+func (s *Scheduler) recordStatus(p PhaseInfo) {
+	if s.season == nil {
+		return
+	}
+	st := s.state()
+	if st.Status.Phase == string(p.Phase) && st.Status.Season == p.Season {
+		return
+	}
+	st.Status = seasonstate.Status{Phase: string(p.Phase), Season: p.Season, UpdatedAt: s.now().UTC().Format(time.RFC3339)}
+	s.saveSeasonState()
 }
 
 // fallbackPhase guesses from the month when no calendar data is available at all.

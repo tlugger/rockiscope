@@ -70,6 +70,25 @@ The Rockies' season ends in September. Rockiscope's doesn't. The bot reads MLB's
 - **Polite.** MLB requests are spaced out, the bot posts nothing between 10 PM and 8 AM except game results, and a daily post cap catches runaway bugs.
 - **Clock-aware.** The bot waits for NTP before acting, since a Pi has no hardware clock, and timezone data is embedded in the binary.
 
+## 📊 Dashboard
+
+`rockiscope run` also serves an analytics dashboard on port 8086 (`ROCKISCOPE_PORT` to change it).
+
+- **Every season, every phase.** Pick a season, then switch between ⚾ Regular Season, 🍼 Postseason, 🌵 Spring Training and 🔥 Hot Stove. Each prediction phase gets the same set:
+  - **Cosmic highlights:** biggest upset, worst whiff, called shots, streaks.
+  - **A game-by-game season calendar.**
+  - **The Bot vs. the Pessimist:** would "always pick L" have beaten us? (In 2026 it did, by 5.) Postseason and spring race a coin flip instead.
+  - **Stars vs. Science:** who was right when the horoscope disagreed with the stats.
+  - **Confidence Is Decorative:** accuracy by the confidence phrase the posts used.
+  - **Record by opponent**, and a game log with links to the Bluesky posts.
+- **Regular season** adds **Trust in the Stars**, the weights rebuilt game by game by replaying the engine's updates, plus the factor-weights pie.
+- **Postseason** adds the Adoption Agency (who we adopted, when they let us down) and the playoff birth-chart audit.
+- **Hot Stove** shows every roster move posted, with signs and Rockies compatibility.
+- **Finished seasons** get their report card. 📚 **All-time** compares seasons side by side.
+- **A phase banner** shows what the bot is doing right now: the adopted team, the Opening Day countdown, or spring picks.
+
+It's read-only: the dashboard reads the same crash-safe files the bot writes, including `archive/`. The JSON is available at `/api/status`, `/api/seasons` and `/api/season/{year}`.
+
 ## 📡 CLI
 
 ```

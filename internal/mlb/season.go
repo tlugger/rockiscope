@@ -87,6 +87,7 @@ type SeasonProvider interface {
 	GetTransactions(startDate, endDate string) ([]Transaction, error)
 	GetTeamRecordFor(teamID, season int) (*TeamRecord, error)
 	GetRockiesGamesBetween(startDate, endDate, gameType string) ([]*Game, error)
+	GetSeasonResultsFor(season int) ([]GameResult, error)
 }
 
 func (c *Client) GetSeasonDates(year int) (*SeasonDates, error) {

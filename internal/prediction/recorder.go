@@ -57,8 +57,8 @@ type PredictionRecord struct {
 	Predicted     string        `json:"predicted"` // "W" or "L"
 	Confidence   float64       `json:"confidence"` // 0-100
 	Actual       string        `json:"actual,omitempty"` // "W" or "L" or ""
-	RockiesScore int          `json:"rockiesScore,omitempty"`
-	OppScore     int          `json:"oppScore,omitempty"`
+	RockiesScore int          `json:"rockiesScore"` // always written: 0 is a real score (shutouts)
+	OppScore     int          `json:"oppScore"`
 	Synthetic    bool         `json:"synthetic,omitempty"` // backfilled pre-bot record; excluded from prediction-accuracy stats
 	PostURI       string        `json:"postUri,omitempty"`
 	GamePK       int          `json:"gamePk,omitempty"`
@@ -72,11 +72,11 @@ type PredictionHistory struct {
 	Current    Weights            `json:"currentWeights"`
 }
 
+// Add appends a record. There is deliberately no cap: trimming the oldest
+// records silently deleted the start of the season. The yearly rollover to
+// archive/ keeps the file to one season (~200 records).
 func (h *PredictionHistory) Add(pred PredictionRecord) {
 	h.Predictions = append(h.Predictions, pred)
-	if len(h.Predictions) > 200 {
-		h.Predictions = h.Predictions[len(h.Predictions)-200:]
-	}
 }
 
 func (h *PredictionHistory) UpdatePostURI(gamePk int, date, uri string) {

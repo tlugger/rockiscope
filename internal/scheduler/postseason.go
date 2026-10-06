@@ -273,12 +273,13 @@ func (s *Scheduler) predictAdoptedGames(season int, a adoption, b bracket, r *ti
 			r.fail("adopted game prediction", err)
 			continue
 		}
-		team, opp, _ := g.Side(a.TeamID)
+		team, opp, isHome := g.Side(a.TeamID)
 		if s.findPick(pickPostseason, g.GamePk) == nil {
 			s.state().Picks = append(s.state().Picks, pick{
 				Kind: pickPostseason, Season: season, GamePk: g.GamePk, Date: g.OfficialDate,
-				TeamID: team.ID, TeamName: team.Name, Opponent: opp.Name,
+				TeamID: team.ID, TeamName: team.Name, Opponent: opp.Name, IsHome: isHome,
 				Pick: post.Prediction.Pick, WinProbability: post.Prediction.WinProbability,
+				Factors: post.Prediction.FactorScores(), Series: g.SeriesShort,
 				PostURI: uri, FirstPitch: g.GameDateTime,
 			})
 			s.saveSeasonState()
@@ -375,6 +376,11 @@ func (s *Scheduler) settlePostseasonPicks(season int, b bracket, r *tickResult) 
 			continue
 		}
 		p.Score = fmt.Sprintf("%d-%d", team.Score, opp.Score)
+		p.TeamScore, p.OppScore = team.Score, opp.Score
+		p.SeriesResult = g.SeriesResult
+		if p.Series == "" {
+			p.Series = g.SeriesShort
+		}
 		s.saveSeasonState()
 	}
 }

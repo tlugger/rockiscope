@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"time"
 )
 
 //go:embed dashboard.html favicon.ico
@@ -15,10 +16,11 @@ var staticFiles embed.FS
 type Server struct {
 	dataDir string
 	logger  *log.Logger
+	now     func() time.Time
 }
 
 func NewServer(dataDir string, logger *log.Logger) *Server {
-	return &Server{dataDir: dataDir, logger: logger}
+	return &Server{dataDir: dataDir, logger: logger, now: time.Now}
 }
 
 func (s *Server) Handler() http.Handler {
@@ -26,6 +28,9 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("/", s.handleDashboard)
 	mux.HandleFunc("/favicon.ico", s.handleFavicon)
 	mux.HandleFunc("/api/predictions", s.handlePredictions)
+	mux.HandleFunc("GET /api/status", s.handleStatus)
+	mux.HandleFunc("GET /api/seasons", s.handleSeasons)
+	mux.HandleFunc("GET /api/season/{year}", s.handleSeason)
 	return mux
 }
 

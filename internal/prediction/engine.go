@@ -206,6 +206,19 @@ func confidenceLabel(prob float64) string {
 	}
 }
 
+// FactorScores flattens the prediction's factor map for storage.
+func (p Prediction) FactorScores() FactorScores {
+	f := p.Factors
+	return FactorScores{
+		WinRate:  f["winRate"],
+		Pitcher:  f["pitcher"],
+		H2H:      f["h2h"],
+		HomeAway: f["homeAway"],
+		Momentum: f["momentum"],
+		Stars:    f["stars"],
+	}
+}
+
 // FormatPrediction returns a human-readable prediction string.
 func (p Prediction) FormatPrediction() string {
 	pct := p.WinProbability * 100

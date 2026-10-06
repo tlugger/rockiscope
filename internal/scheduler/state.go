@@ -4,114 +4,33 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
-	"path/filepath"
 	"time"
 
-	"github.com/tlugger/rockiscope/internal/astro"
 	"github.com/tlugger/rockiscope/internal/fsutil"
 	"github.com/tlugger/rockiscope/internal/mlb"
-	"github.com/tlugger/rockiscope/internal/prediction"
+	"github.com/tlugger/rockiscope/internal/seasonstate"
 )
 
-const seasonStateFileName = "season_state.json"
+const seasonStateFileName = seasonstate.FileName
 
-// pick is a prediction made outside the regular season (postseason adoption
-// or spring training). These never touch prediction_history.json, so they
-// can't skew the real season's stats or the learned weights.
-type pick struct {
-	Kind           string    `json:"kind"` // pickPostseason | pickSpring
-	Season         int       `json:"season"`
-	GamePk         int       `json:"gamePk"`
-	Date           string    `json:"date"`
-	TeamID         int       `json:"teamId"`
-	TeamName       string    `json:"teamName"`
-	Opponent       string    `json:"opponent"`
-	Pick           string    `json:"pick"` // "W"/"L" from TeamID's perspective
-	WinProbability float64   `json:"winProbability"`
-	PostURI        string    `json:"postUri,omitempty"`
-	Result         string    `json:"result,omitempty"` // "W"/"L" once final, "void" if never played
-	Score          string    `json:"score,omitempty"`
-	FirstPitch     time.Time `json:"firstPitch"`
-}
+// Local names for the persisted types; the definitions live in seasonstate so
+// the dashboard can read the same file.
+type (
+	pick        = seasonstate.Pick
+	adoption    = seasonstate.Adoption
+	openingDay  = seasonstate.OpeningDay
+	seasonState = seasonstate.State
+)
 
 const (
-	pickPostseason = "postseason"
-	pickSpring     = "spring"
+	pickPostseason = seasonstate.PickPostseason
+	pickSpring     = seasonstate.PickSpring
 )
 
-type adoption struct {
-	Season       int                 `json:"season"`
-	TeamID       int                 `json:"teamId"`
-	TeamName     string              `json:"teamName"`
-	AdoptedOn    string              `json:"adoptedOn"`
-	EliminatedOn string              `json:"eliminatedOn,omitempty"`
-	Reading      astro.RosterReading `json:"reading"`
-}
-
-type openingDay struct {
-	Date     string `json:"date"`
-	Opponent string `json:"opponent,omitempty"`
-	IsHome   bool   `json:"isHome"`
-}
-
-// seasonState is everything the off-season modes need to survive a restart.
-// Every post is recorded in Done under an idempotency key the moment it
-// succeeds, so a reboot mid-day (or mid-thread) resumes without double-posting.
-type seasonState struct {
-	Done               map[string]string              `json:"done"` // key -> post URI ("" when deliberately skipped)
-	PostsByDay         map[string]int                 `json:"postsByDay"`
-	SeasonDates        map[string]mlb.SeasonDates     `json:"seasonDates"`
-	SeasonDatesFetched string                         `json:"seasonDatesFetched,omitempty"`
-	OpeningDays        map[string]openingDay          `json:"openingDays"`
-	Readings           map[string]astro.RosterReading `json:"readings"` // "season:teamID"
-	Adoptions          []adoption                     `json:"adoptions"`
-	Champions          map[string]string              `json:"champions"` // season -> champion
-	ChampionDates      map[string]string              `json:"championDates"`
-	Picks              []pick                         `json:"picks"`
-	TxnSeen            map[string]string              `json:"txnSeen"` // transaction id -> date
-	HotStoveSince      string                         `json:"hotStoveSince,omitempty"`
-	// Rollovers holds the summary of each archived season, keyed by the new season.
-	Rollovers map[string]prediction.SeasonSummary `json:"rollovers"`
-}
-
-func newSeasonState() *seasonState {
-	st := &seasonState{}
-	st.init()
-	return st
-}
-
-func (st *seasonState) init() {
-	if st.Done == nil {
-		st.Done = map[string]string{}
-	}
-	if st.PostsByDay == nil {
-		st.PostsByDay = map[string]int{}
-	}
-	if st.SeasonDates == nil {
-		st.SeasonDates = map[string]mlb.SeasonDates{}
-	}
-	if st.OpeningDays == nil {
-		st.OpeningDays = map[string]openingDay{}
-	}
-	if st.Readings == nil {
-		st.Readings = map[string]astro.RosterReading{}
-	}
-	if st.Champions == nil {
-		st.Champions = map[string]string{}
-	}
-	if st.ChampionDates == nil {
-		st.ChampionDates = map[string]string{}
-	}
-	if st.TxnSeen == nil {
-		st.TxnSeen = map[string]string{}
-	}
-	if st.Rollovers == nil {
-		st.Rollovers = map[string]prediction.SeasonSummary{}
-	}
-}
+func newSeasonState() *seasonState { return seasonstate.New() }
 
 func (s *Scheduler) seasonStatePath() string {
-	return filepath.Join(s.dataDir, seasonStateFileName)
+	return seasonstate.Path(s.dataDir)
 }
 
 func (s *Scheduler) loadSeasonState() {
@@ -119,10 +38,7 @@ func (s *Scheduler) loadSeasonState() {
 	if s.dataDir == "" {
 		return
 	}
-	data, fromBackup, err := fsutil.ReadFileWithFallback(s.seasonStatePath(), func(b []byte) error {
-		var probe seasonState
-		return json.Unmarshal(b, &probe)
-	})
+	st, fromBackup, err := seasonstate.Read(s.dataDir)
 	if os.IsNotExist(err) {
 		s.logger.Println("no season state yet, starting fresh")
 		return
@@ -137,12 +53,7 @@ func (s *Scheduler) loadSeasonState() {
 	if fromBackup {
 		s.logger.Println("warning: season state was damaged, recovered from backup")
 	}
-	if err := json.Unmarshal(data, s.st); err != nil {
-		s.logger.Printf("warning: parsing season state: %v", err)
-		s.st = newSeasonState()
-		return
-	}
-	s.st.init()
+	s.st = st
 }
 
 // state returns the season state, creating an empty one if needed (tests build

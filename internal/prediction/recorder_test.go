@@ -161,7 +161,7 @@ func TestPredictionHistory_Add(t *testing.T) {
 	}
 }
 
-func TestPredictionHistory_AddLimit(t *testing.T) {
+func TestPredictionHistory_AddNeverTrims(t *testing.T) {
 	h := &PredictionHistory{
 		Predictions: make([]PredictionRecord, 200),
 		Current:    DefaultWeights(),
@@ -173,8 +173,9 @@ func TestPredictionHistory_AddLimit(t *testing.T) {
 
 	h.Add(PredictionRecord{Date: "2026-04-50"})
 
-	if len(h.Predictions) > 200 {
-		t.Errorf("should cap at 200: %d", len(h.Predictions))
+	// A season plus off days and backfill runs past 200; nothing may be dropped.
+	if len(h.Predictions) != 201 || h.Predictions[0].Date != "2026-04-01" {
+		t.Errorf("records were trimmed: %d", len(h.Predictions))
 	}
 }
 
