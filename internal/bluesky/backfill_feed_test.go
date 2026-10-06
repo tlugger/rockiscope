@@ -192,3 +192,33 @@ func TestBackfillFromFeed_SkipsWhenNoGameInWindow(t *testing.T) {
 		t.Errorf("expected no records created, got %d", len(hist.Predictions))
 	}
 }
+
+// Appending new records reallocates the slice; updates to records that
+// already existed must not be lost (they were, via stale pointers).
+func TestBackfillFromFeed_UpdatesExistingAfterAppends(t *testing.T) {
+	var games []mlb.GameResult
+	var items []AuthorFeedItem
+	hist := &prediction.PredictionHistory{}
+	for i := 0; i < 20; i++ {
+		day := time.Date(2026, 4, 1+i, 0, 40, 0, 0, time.UTC) // 6:40 PM MDT the day before
+		pk := 900 + i
+		date := day.Add(-12 * time.Hour).Format("2006-01-02")
+		games = append(games, mlb.GameResult{GamePk: pk, Date: date, GameDateTime: day, Opponent: "Miami Marlins", IsHome: true})
+		items = append(items, predPost("at://did:plc:x/app.bsky.feed.post/"+strconv.Itoa(pk), day.Add(-time.Hour).Format(time.RFC3339), gameText("vs", "Miami Marlins", "L", 60)))
+		if i%2 == 0 {
+			hist.Predictions = append(hist.Predictions, prediction.PredictionRecord{GamePK: pk, Date: date, Opponent: "Miami Marlins", Predicted: "L", Actual: "L", Synthetic: true})
+		}
+	}
+	hist.Predictions = hist.Predictions[:len(hist.Predictions):len(hist.Predictions)] // no spare capacity
+
+	backfillFromFeed(hist, items, games, testLogger())
+
+	if len(hist.Predictions) != 20 {
+		t.Fatalf("records = %d, want 20", len(hist.Predictions))
+	}
+	for _, p := range hist.Predictions {
+		if p.Synthetic || p.PostURI == "" {
+			t.Errorf("game %d lost its backfilled prediction: %+v", p.GamePK, p)
+		}
+	}
+}
