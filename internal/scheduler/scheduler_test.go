@@ -136,6 +136,14 @@ func TestTick_GameDay(t *testing.T) {
 		t.Errorf("expected 1 image, got %d", poster.images)
 	}
 
+	rec := s.predHistory.Predictions[0]
+	if rec.RockiesStarter == nil || rec.RockiesStarter.Name != "Michael Lorenzen" || !rec.RockiesStarter.HasStats || rec.RockiesStarter.ERA != 9.00 {
+		t.Errorf("Rockies starter not recorded: %+v", rec.RockiesStarter)
+	}
+	if rec.OppStarter == nil || rec.OppStarter.Name != "Framber Valdez" {
+		t.Errorf("opponent starter not recorded: %+v", rec.OppStarter)
+	}
+
 	today := nowTime.In(denver).Format("2006-01-02")
 	if s.lastPostDate != today {
 		t.Errorf("lastPostDate = %q, want %q", s.lastPostDate, today)

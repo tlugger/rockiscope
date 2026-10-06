@@ -9,6 +9,7 @@ import (
 	"sort"
 
 	"github.com/tlugger/rockiscope/internal/fsutil"
+	"github.com/tlugger/rockiscope/internal/mlb"
 )
 
 const historyFileName = "prediction_history.json"
@@ -50,6 +51,29 @@ func (w Weights) total() float64 {
 	return w.WinRate + w.Pitcher + w.H2H + w.HomeAway + w.Momentum + w.Stars
 }
 
+// Starter is a starting pitcher as known at prediction time. ERA/WHIP are the
+// season numbers that day (HasStats false when they weren't available, e.g. a
+// name backfilled from MLB's schedule after the fact).
+type Starter struct {
+	ID       int     `json:"id,omitempty"`
+	Name     string  `json:"name"`
+	ERA      float64 `json:"era,omitempty"`
+	WHIP     float64 `json:"whip,omitempty"`
+	HasStats bool    `json:"hasStats,omitempty"`
+}
+
+// NewStarter builds a Starter from a probable pitcher and (optional) stats.
+func NewStarter(info *mlb.PitcherInfo, stats *mlb.PitcherStats) *Starter {
+	if info == nil {
+		return nil
+	}
+	st := &Starter{ID: info.ID, Name: info.FullName}
+	if stats != nil && stats.InningsPitched > 0 {
+		st.ERA, st.WHIP, st.HasStats = stats.ERA, stats.WHIP, true
+	}
+	return st
+}
+
 type PredictionRecord struct {
 	Date          string        `json:"date"`
 	Opponent      string        `json:"opponent"`
@@ -65,6 +89,8 @@ type PredictionRecord struct {
 	GameNumber   int          `json:"gameNumber,omitempty"` // 1 or 2 for double-headers
 	Factors      FactorScores  `json:"factors"`
 	WinProbability float64    `json:"winProbability"`
+	RockiesStarter *Starter   `json:"rockiesStarter,omitempty"`
+	OppStarter     *Starter   `json:"oppStarter,omitempty"`
 }
 
 type PredictionHistory struct {

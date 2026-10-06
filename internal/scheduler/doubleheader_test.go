@@ -3,6 +3,7 @@ package scheduler
 import (
 	"testing"
 
+	"github.com/tlugger/rockiscope/internal/formatter"
 	"github.com/tlugger/rockiscope/internal/mlb"
 	"github.com/tlugger/rockiscope/internal/prediction"
 )
@@ -32,7 +33,7 @@ func TestRecordPrediction_UsesOfficialDateAndGameNumber(t *testing.T) {
 	pred := prediction.Prediction{WinProbability: 0.53, Pick: "W"}
 
 	// Pass a WRONG wall-clock date; the record should use the official date.
-	s.recordPrediction("2026-04-25", game, pred, "at://post/1")
+	s.recordPrediction("2026-04-25", game, formatter.Post{Prediction: pred}, "at://post/1")
 
 	if len(s.predHistory.Predictions) != 1 {
 		t.Fatalf("expected 1 record, got %d", len(s.predHistory.Predictions))

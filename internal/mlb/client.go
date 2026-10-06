@@ -103,6 +103,9 @@ type GameResult struct {
 	Won         bool   `json:"won"`
 	Status     string `json:"status"`
 	GameNumber  int    `json:"gameNumber,omitempty"`
+	// Announced starters (the schedule's probable pitchers), when known.
+	RockiesStarter *PitcherInfo `json:"rockiesStarter,omitempty"`
+	OppStarter     *PitcherInfo `json:"oppStarter,omitempty"`
 }
 
 func (c *Client) GetGameLiveStatus(date string) ([]GameLiveStatus, error) {
@@ -127,7 +130,7 @@ func (c *Client) GetGameLiveStatus(date string) ([]GameLiveStatus, error) {
 }
 
 func (c *Client) GetGamesSince(date string) ([]GameResult, error) {
-	url := fmt.Sprintf("%s/schedule?sportId=1&teamId=%d&startDate=%s&endDate=%s&hydrate=linescore",
+	url := fmt.Sprintf("%s/schedule?sportId=1&teamId=%d&startDate=%s&endDate=%s&hydrate=linescore,probablePitcher",
 		baseURL, c.teamID, date, date)
 	var resp scheduleResponse
 	if err := c.getJSON(url, &resp); err != nil {
@@ -143,7 +146,7 @@ func (c *Client) GetSeasonResults() ([]GameResult, error) {
 
 // GetSeasonResultsFor returns every completed regular-season Rockies game for a season.
 func (c *Client) GetSeasonResultsFor(season int) ([]GameResult, error) {
-	url := fmt.Sprintf("%s/schedule?sportId=1&teamId=%d&season=%d&gameType=R&hydrate=linescore",
+	url := fmt.Sprintf("%s/schedule?sportId=1&teamId=%d&season=%d&gameType=R&hydrate=linescore,probablePitcher",
 		c.base(), c.teamID, season)
 	var resp scheduleResponse
 	if err := c.getJSON(url, &resp); err != nil {
@@ -187,6 +190,13 @@ func (c *Client) parseGameResults(resp scheduleResponse) []GameResult {
 			gr.GameNumber = g.GameNumber
 			gr.Status = g.Status.AbstractGameState
 
+			us, them := g.Teams.Home, g.Teams.Away
+			if g.Teams.Away.Team.ID == c.teamID {
+				us, them = them, us
+			}
+			gr.RockiesStarter = pitcherInfo(us.ProbablePitcher.ID, us.ProbablePitcher.FullName)
+			gr.OppStarter = pitcherInfo(them.ProbablePitcher.ID, them.ProbablePitcher.FullName)
+
 			if g.Teams.Away.Team.ID == c.teamID {
 				gr.OpponentID = g.Teams.Home.Team.ID
 				gr.Opponent = g.Teams.Home.Team.Name
@@ -207,6 +217,13 @@ func (c *Client) parseGameResults(resp scheduleResponse) []GameResult {
 		}
 	}
 	return results
+}
+
+func pitcherInfo(id int, name string) *PitcherInfo {
+	if id == 0 {
+		return nil
+	}
+	return &PitcherInfo{ID: id, FullName: name}
 }
 
 // URL-parameterized methods — used by both production code and tests.

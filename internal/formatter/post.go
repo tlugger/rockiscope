@@ -15,6 +15,10 @@ type Post struct {
 	HoroscopeText string // full text for image card, empty if unavailable
 	Prediction    prediction.Prediction
 	Game         *mlb.Game
+	// Starters behind the prediction, for the history record (team = the side
+	// being predicted: the Rockies, or the adopted postseason team).
+	TeamStarter *prediction.Starter
+	OppStarter  *prediction.Starter
 }
 
 type GameDayPost struct {
