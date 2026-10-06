@@ -48,6 +48,28 @@ After each game, Rockiscope posts a follow-up reply with the result:
 📊 Rockies L | 7-3 | Season: 6/10 correct
 ```
 
+## 🗓️ The Other Six Months
+
+The Rockies' season ends in September. Rockiscope's doesn't. The bot reads MLB's season calendar and changes modes on its own:
+
+| Phase | What it posts |
+|-------|---------------|
+| ⚾ **Regular season** | Everything above. Unchanged. |
+| 🍼 **Postseason** | A **report card** thread for the season (accuracy, which signals worked, what the model learned, best call, worst miss). Then the bot **adopts a playoff team**, picking the roster whose players' birth charts are most compatible with a Cancer. It predicts the adopted team's games and replies with results. When they're eliminated, it re-adopts. When someone wins the World Series, it takes credit if it can. |
+| 🔥 **Hot stove** | Only posts when something happens. Rockies trades, signings, waiver claims, DFAs and releases are checked at 10 AM and 5 PM, each with the player's zodiac sign and Rockies compatibility. Minor-league deals are ignored, and busy days roll up into a digest. Every Sunday there's an **Opening Day countdown**. |
+| 🌵 **Spring training** | Predictions for spring games. *It doesn't count. Neither does this.* These picks are stored separately and never touch the real season's weights. The countdown goes daily for the final week. |
+
+**Season rollover.** When spring training starts, the finished season's predictions, final weights and a stats summary are archived to `archive/<season>/`. The live history then resets with default weights and the bot announces the fresh start. If the bot was offline all spring, the rollover happens on Opening Day instead.
+
+### 🛟 Built to survive a Raspberry Pi
+
+- **Crash-safe state.** Every file is written atomically with a `.bak` fallback, so a power cut mid-write can't corrupt the season.
+- **No double posts.** Every seasonal post has an idempotency key that's saved the moment it posts. A reboot mid-day, or mid-thread, picks up exactly where it left off.
+- **No late predictions.** If the Pi was down through a pregame window, that game is skipped. Predicting after first pitch would be cheating.
+- **Graceful degradation.** Failed API calls retry with backoff, then the bot tries again in 15 minutes. If MLB's calendar is unreachable it falls back to a cached copy, then to a month-based guess. If a horoscope or stat is missing, the post goes out without it.
+- **Polite.** MLB requests are spaced out, the bot posts nothing between 10 PM and 8 AM except game results, and a daily post cap catches runaway bugs.
+- **Clock-aware.** The bot waits for NTP before acting, since a Pi has no hardware clock, and timezone data is embedded in the binary.
+
 ## 📡 CLI
 
 ```
@@ -55,7 +77,8 @@ rockiscope <command>
 
   run          Start the daemon (default)
   post         Force a post now, skip the schedule
-  preview      Print what would be posted, don't touch Bluesky
+  preview      Print what would be posted, don't touch Bluesky or any files
+  phase        Show the current mode (regular season, postseason, offseason, spring)
   test-auth    Verify Bluesky credentials
   test-mlb     Hit the MLB API and show today's game
   test-horo    Scrape today's horoscope
@@ -84,7 +107,12 @@ sudo systemctl start rockiscope
 
 Create an app password at [bsky.app/settings/app-passwords](https://bsky.app/settings/app-passwords).
 
-To **update**, just re-run the same install command — it'll stop the service, download the latest binary, and restart.
+To **update**, re-run the same install command. It:
+
+1. backs up your data (`prediction_history.json`, `season_state.json`, `archive/`) to `backups/`
+2. downloads and checksum-verifies the new binary *before* touching the running bot
+3. swaps it in, keeping the old one as `rockiscope.prev`
+4. restarts and health-checks the service, **rolling back automatically** if the new version won't stay up
 
 ### Managing the service
 

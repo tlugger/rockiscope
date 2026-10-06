@@ -17,6 +17,7 @@ type Game struct {
 	IsHome        bool // true if Rockies are the home team
 	GameNumber    int  // 1 or 2 for double-headers
 	DoubleHeader  string // "Y" (straight), "S" (split), "N" (not)
+	GameType      string // "R" regular, "S" spring, "F"/"D"/"L"/"W" postseason
 }
 
 func (g *Game) IsPlayable() bool {

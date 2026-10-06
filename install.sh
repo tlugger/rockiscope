@@ -65,21 +65,36 @@ EOF
   NEEDS_CREDS=1
 fi
 
-# ── Local binary ────────────────────────────────────────────────────
+# ── Back up bot data ────────────────────────────────────────────────
+# Upgrades never touch these files, but a copy costs nothing and the season's
+# prediction history can't be regenerated.
+
+DATA_FILES=(prediction_history.json season_state.json last_post_date last_reply_date archive)
+EXISTING=()
+for f in "${DATA_FILES[@]}"; do
+  [ -e "$INSTALL_DIR/$f" ] && EXISTING+=("$f")
+done
+
+if [ ${#EXISTING[@]} -gt 0 ]; then
+  step "Backing up bot data"
+  mkdir -p "$INSTALL_DIR/backups"
+  BACKUP="$INSTALL_DIR/backups/data-$(date +%Y%m%d-%H%M%S).tar.gz"
+  tar -czf "$BACKUP" -C "$INSTALL_DIR" "${EXISTING[@]}"
+  ok "Saved ${EXISTING[*]} → $BACKUP"
+  # Keep the 10 most recent backups.
+  ls -1t "$INSTALL_DIR"/backups/data-*.tar.gz 2>/dev/null | tail -n +11 | xargs -r rm -f || true
+fi
+
+# ── Stage the new binary ────────────────────────────────────────────
+# The running service keeps going until a verified binary is ready.
+
+STAGED="$INSTALL_DIR/rockiscope.new"
+rm -f "$STAGED"
 
 if [ "$CURR_DIR" != "$INSTALL_DIR" ] && [ -f "$CURR_DIR/rockiscope" ]; then
-  step "Installing local binary"
-
-  if systemctl is-active "$SERVICE_NAME" &>/dev/null; then
-    systemctl stop "$SERVICE_NAME"
-    ok "Stopped running service"
-  fi
-
-  cp "$CURR_DIR/rockiscope" "$INSTALL_DIR/rockiscope"
-  chmod +x "$INSTALL_DIR/rockiscope"
-  SKIP_BINARY=1
-
-  ok "Installed from current directory"
+  step "Using local binary"
+  cp "$CURR_DIR/rockiscope" "$STAGED"
+  ok "Staged binary from current directory"
 else
   # ── Architecture ─────────────────────────────────────────────────
   step "Detecting system"
@@ -93,25 +108,32 @@ else
   esac
   ok "Architecture: $ARCH → linux/$GOARCH"
 
-  # Stop running service before replacing
-  if systemctl is-active "$SERVICE_NAME" &>/dev/null; then
-    systemctl stop "$SERVICE_NAME"
-    ok "Stopped running service"
-  fi
-
   # ── Get the binary ─────────────────────────────────────────────────
   step "Getting rockiscope binary"
 
-  DOWNLOAD_URL=$(curl -sf "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null \
-    | grep "browser_download_url.*linux.*${GOARCH}" \
+  RELEASE_JSON=$(curl -sf "https://api.github.com/repos/$REPO/releases/latest" 2>/dev/null || true)
+  DOWNLOAD_URL=$(echo "$RELEASE_JSON" \
+    | grep "browser_download_url.*linux-${GOARCH}\"" \
     | head -1 \
     | cut -d '"' -f 4 || true)
 
   if [ -n "$DOWNLOAD_URL" ]; then
     echo "  📦 Found release binary"
-    (curl -sfL -o "$INSTALL_DIR/rockiscope" "$DOWNLOAD_URL") &
-    spin $! "Downloading binary"
-    chmod +x "$INSTALL_DIR/rockiscope"
+    (curl -sfL --retry 3 -o "$STAGED" "$DOWNLOAD_URL") &
+    spin $! "Downloading binary" || fail "Download failed. The running bot was not touched."
+
+    SUM_URL=$(echo "$RELEASE_JSON" | grep "browser_download_url.*linux-${GOARCH}.sha256" | head -1 | cut -d '"' -f 4 || true)
+    if [ -n "$SUM_URL" ] && command -v sha256sum &>/dev/null; then
+      EXPECTED=$(curl -sfL --retry 3 "$SUM_URL" | awk '{print $1}' || true)
+      ACTUAL=$(sha256sum "$STAGED" | awk '{print $1}')
+      if [ -z "$EXPECTED" ] || [ "$EXPECTED" != "$ACTUAL" ]; then
+        rm -f "$STAGED"
+        fail "Checksum mismatch. The running bot was not touched."
+      fi
+      ok "Checksum verified"
+    else
+      warn "No checksum available, skipping verification"
+    fi
   else
     echo "  📦 No release found — building from source"
 
@@ -136,22 +158,37 @@ else
 
     VERSION=$(git -C "$TMPDIR/rockiscope" describe --tags --always 2>/dev/null || echo "dev")
 
-    (cd "$TMPDIR/rockiscope" && go build -ldflags "-X main.version=$VERSION" -o "$INSTALL_DIR/rockiscope" . 2>&1) &
-    spin $! "Building binary"
-
-    chmod +x "$INSTALL_DIR/rockiscope"
+    (cd "$TMPDIR/rockiscope" && go build -ldflags "-X main.version=$VERSION" -o "$STAGED" . 2>&1) &
+    spin $! "Building binary" || fail "Build failed. The running bot was not touched."
   fi
 fi
 
-ok "Binary installed to $INSTALL_DIR/rockiscope"
-
-# Verify it runs
-if "$INSTALL_DIR/rockiscope" version &>/dev/null; then
-  VERSION=$("$INSTALL_DIR/rockiscope" version 2>&1)
-  ok "$VERSION"
-else
-  warn "Binary version check failed — continuing anyway"
+chmod +x "$STAGED"
+if ! NEW_VERSION=$("$STAGED" version 2>&1); then
+  rm -f "$STAGED"
+  fail "New binary won't run on this machine. The running bot was not touched."
 fi
+ok "Staged $NEW_VERSION"
+
+# ── Swap it in ──────────────────────────────────────────────────────
+
+step "Installing binary"
+
+if [ -f "$INSTALL_DIR/rockiscope" ]; then
+  OLD_VERSION=$("$INSTALL_DIR/rockiscope" version 2>/dev/null || echo "unknown version")
+fi
+
+if systemctl is-active "$SERVICE_NAME" &>/dev/null; then
+  systemctl stop "$SERVICE_NAME"
+  ok "Stopped running service"
+fi
+
+if [ -f "$INSTALL_DIR/rockiscope" ]; then
+  mv -f "$INSTALL_DIR/rockiscope" "$INSTALL_DIR/rockiscope.prev"
+  ok "Kept previous binary as rockiscope.prev (${OLD_VERSION:-unknown})"
+fi
+mv -f "$STAGED" "$INSTALL_DIR/rockiscope"
+ok "Binary installed to $INSTALL_DIR/rockiscope"
 
 # ── systemd service ─────────────────────────────────────────────────
 
@@ -160,8 +197,8 @@ step "Setting up systemd service"
 cat > "/etc/systemd/system/${SERVICE_NAME}.service" << EOF
 [Unit]
 Description=Rockiscope - Rockies Horoscope Bot
-After=network-online.target
-Wants=network-online.target
+After=network-online.target time-sync.target
+Wants=network-online.target time-sync.target
 
 [Service]
 Type=simple
@@ -186,7 +223,24 @@ if [ "${NEEDS_CREDS:-}" = "1" ]; then
   warn "Service installed but not started — update .env first"
 else
   systemctl restart "$SERVICE_NAME"
-  ok "Service started"
+
+  # Give it a moment, then make sure it stayed up. If not, put the old
+  # binary back so the bot never ends up dead after an upgrade.
+  sleep 10
+  if systemctl is-active "$SERVICE_NAME" &>/dev/null; then
+    ok "Service started"
+  elif [ -f "$INSTALL_DIR/rockiscope.prev" ]; then
+    warn "New version failed to stay running. Rolling back."
+    tail -n 20 "$INSTALL_DIR/rockiscope.log" 2>/dev/null | sed 's/^/     /' || true
+    mv -f "$INSTALL_DIR/rockiscope.prev" "$INSTALL_DIR/rockiscope"
+    systemctl restart "$SERVICE_NAME"
+    fail "Rolled back to ${OLD_VERSION:-the previous version}. Check $INSTALL_DIR/rockiscope.log"
+  else
+    fail "Service failed to start. Check $INSTALL_DIR/rockiscope.log"
+  fi
+
+  PHASE=$(cd "$INSTALL_DIR" && ROCKISCOPE_DATA_DIR="$INSTALL_DIR" "$INSTALL_DIR/rockiscope" phase 2>/dev/null | grep '^Phase:' | awk '{print $2}' || true)
+  [ -n "$PHASE" ] && ok "Bot mode: $PHASE"
 fi
 
 # ── Done ───────────────────────────────────────────────────────────
@@ -206,7 +260,8 @@ echo "  Commands:"
 echo "    sudo systemctl status rockiscope     # check status"
 echo "    sudo systemctl restart rockiscope   # restart"
 echo "    tail -f $INSTALL_DIR/rockiscope.log # view logs"
-echo "    $INSTALL_DIR/rockiscope preview    # preview today's post"
+echo "    $INSTALL_DIR/rockiscope phase      # show the current mode"
+echo "    $INSTALL_DIR/rockiscope preview    # preview what would post (dry run)"
 echo "    $INSTALL_DIR/rockiscope post        # force post now"
 echo ""
 echo "  Maybe this is our year. Probably not. 🏔️"

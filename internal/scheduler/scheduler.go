@@ -5,10 +5,12 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 
 	"github.com/tlugger/rockiscope/internal/bluesky"
 	"github.com/tlugger/rockiscope/internal/formatter"
+	"github.com/tlugger/rockiscope/internal/fsutil"
 	"github.com/tlugger/rockiscope/internal/horoscope"
 	imgcard "github.com/tlugger/rockiscope/internal/image"
 	"github.com/tlugger/rockiscope/internal/mlb"
@@ -27,14 +29,26 @@ type Scheduler struct {
 	lastPostDate   string
 	lastReplyDate string
 	predHistory   *prediction.PredictionHistory
+
+	// season drives the postseason/offseason/spring modes. When nil the bot
+	// behaves exactly as it always has (regular-season logic year-round).
+	season mlb.SeasonProvider
+	st     *seasonState
+	// dryRun keeps every state file untouched (preview).
+	dryRun bool
+	// ignoreTimeGates posts seasonal content immediately instead of waiting
+	// for its window (preview and the manual `post` command).
+	ignoreTimeGates bool
 }
 
 type Config struct {
 	MLB       mlb.GameProvider
+	Season    mlb.SeasonProvider
 	Horoscope horoscope.Provider
 	Poster    bluesky.Poster
 	Logger    *log.Logger
 	DataDir   string
+	DryRun    bool
 }
 
 func New(cfg Config) *Scheduler {
@@ -46,10 +60,13 @@ func New(cfg Config) *Scheduler {
 		sleep:     time.Sleep,
 		logger:    cfg.Logger,
 		dataDir:   cfg.DataDir,
+		season:    cfg.Season,
+		dryRun:    cfg.DryRun,
 	}
 	loadLastPostDate(s)
 	loadLastReplyDate(s)
 	loadPredictionHistory(s)
+	s.loadSeasonState()
 	return s
 }
 
@@ -91,7 +108,7 @@ func saveLastPostDate(s *Scheduler) error {
 		return fmt.Errorf("creating data dir: %w", err)
 	}
 
-	if err := os.WriteFile(s.lastPostDateFile(), []byte(s.lastPostDate), 0644); err != nil {
+	if err := fsutil.WriteFileAtomic(s.lastPostDateFile(), []byte(s.lastPostDate), 0644); err != nil {
 		return fmt.Errorf("saving last post date: %w", err)
 	}
 	s.logger.Printf("saved last post date: %s", s.lastPostDate)
@@ -135,7 +152,7 @@ func saveLastReplyDate(s *Scheduler) error {
 		return fmt.Errorf("creating data dir: %w", err)
 	}
 
-	if err := os.WriteFile(s.lastReplyDateFile(), []byte(s.lastReplyDate), 0644); err != nil {
+	if err := fsutil.WriteFileAtomic(s.lastReplyDateFile(), []byte(s.lastReplyDate), 0644); err != nil {
 		return fmt.Errorf("saving last reply date: %w", err)
 	}
 	s.logger.Printf("saved last reply date: %s", s.lastReplyDate)
@@ -164,7 +181,7 @@ func loadPredictionHistory(s *Scheduler) {
 }
 
 func (s *Scheduler) savePredictionHistory() error {
-	if s.dataDir == "" {
+	if s.dataDir == "" || s.dryRun {
 		s.logger.Println("no data dir configured, not saving prediction history")
 		return nil
 	}
@@ -178,20 +195,56 @@ func (s *Scheduler) Run() {
 	s.logger.Println("rockiscope scheduler started")
 
 	for {
-		s.logger.Println("checking for completed games...")
-		if err := s.checkForCompletedGames(); err != nil {
-			s.logger.Printf("warning: could not check completed games: %v", err)
-		}
-
-		err := s.tick()
-		if err != nil {
-			s.logger.Printf("error: %v", err)
-		}
-
-		sleepDur := s.calculateSleepDuration()
+		sleepDur := s.iterate()
 		s.logger.Printf("sleeping for %s", sleepDur.Round(time.Minute))
 		s.sleep(sleepDur)
 	}
+}
+
+const minPlausibleYear = 2026
+
+// iterate runs one wake-up and returns how long to sleep. A panic anywhere in
+// it is logged and retried later instead of taking the daemon down.
+func (s *Scheduler) iterate() (sleepDur time.Duration) {
+	defer func() {
+		if r := recover(); r != nil {
+			s.logger.Printf("PANIC recovered: %v\n%s", r, debug.Stack())
+			sleepDur = retryDelay
+		}
+	}()
+
+	// A Pi has no hardware clock: after a power loss it can boot with a stale
+	// time until NTP syncs. Acting on a bogus date could post nonsense.
+	if s.now().Year() < minPlausibleYear {
+		s.logger.Printf("system clock reads %s, waiting for time sync", s.now().Format(time.RFC3339))
+		return time.Minute
+	}
+
+	phase := s.CurrentPhase()
+	s.logger.Printf("phase: %s", phase)
+
+	if phase.Phase != PhaseRegular {
+		return s.seasonalTick(phase)
+	}
+
+	// Normally the rollover happens in spring; this catches a bot that was
+	// offline (or installed) after Opening Day.
+	rr := &tickResult{now: s.denverNow()}
+	s.rolloverTask(phase.Season, rr)
+	if err := rr.err(); err != nil {
+		s.logger.Printf("warning: %v", err)
+	}
+
+	s.logger.Println("checking for completed games...")
+	if err := s.checkForCompletedGames(); err != nil {
+		s.logger.Printf("warning: could not check completed games: %v", err)
+	}
+
+	if err := s.tick(); err != nil {
+		s.logger.Printf("error: %v", err)
+	}
+
+	return s.calculateSleepDuration()
 }
 
 func (s *Scheduler) calculateSleepDuration() time.Duration {
@@ -793,6 +846,12 @@ func (s *Scheduler) nextCheckTime() time.Time {
 }
 
 func (s *Scheduler) RunOnce() error {
+	if phase := s.CurrentPhase(); phase.Phase != PhaseRegular {
+		s.logger.Printf("phase: %s, running seasonal tasks now", phase)
+		s.ignoreTimeGates = true
+		return s.runSeasonalTasks(phase).err()
+	}
+
 	game, err := s.mlb.GetTodayGame()
 	if err != nil {
 		return fmt.Errorf("fetching today's game: %w", err)
