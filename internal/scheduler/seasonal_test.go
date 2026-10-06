@@ -26,6 +26,7 @@ type mockSeason struct {
 	txns     []mlb.Transaction
 	records  map[int]*mlb.TeamRecord
 	opening  []*mlb.Game
+	results  []mlb.GameResult
 	panicky  bool
 	calls    map[string]int
 }
@@ -68,6 +69,10 @@ func (m *mockSeason) GetTeamRecordFor(id, _ int) (*mlb.TeamRecord, error) {
 		return r, nil
 	}
 	return nil, errors.New("no record")
+}
+func (m *mockSeason) GetSeasonResultsFor(int) ([]mlb.GameResult, error) {
+	m.count("results")
+	return m.results, nil
 }
 func (m *mockSeason) GetRockiesGamesBetween(string, string, string) ([]*mlb.Game, error) {
 	m.count("opening")
@@ -824,5 +829,68 @@ func TestIterate_RecordsStatusOnChange(t *testing.T) {
 	s.iterate()
 	if s.state().Status.UpdatedAt != stamp {
 		t.Error("status rewritten without a phase change")
+	}
+}
+
+// ── history integrity ────────────────────────────────────────────────
+
+func TestSaveHistory_KeepsBackfillWrittenWhileRunning(t *testing.T) {
+	h := newHarness(t)
+	h.now = denverAt(2026, 7, 1, 12, 0)
+	h.hist.Predictions = []prediction.PredictionRecord{{Date: "2026-04-08", Opponent: "Houston Astros", GamePK: 3, Predicted: "L", Actual: "L"}}
+	prediction.SaveHistory(h.hist, h.dir)
+	s := h.scheduler()
+	loadPredictionHistory(s)
+
+	// `rockiscope backfill` runs in another process and adds the opener.
+	disk, _ := prediction.LoadHistory(h.dir)
+	disk.Predictions = append(disk.Predictions, prediction.PredictionRecord{Date: "2026-03-27", Opponent: "Miami Marlins", GamePK: 1, Predicted: "L", Actual: "W", Synthetic: true})
+	time.Sleep(10 * time.Millisecond) // distinct mtime
+	prediction.SaveHistory(disk, h.dir)
+
+	// The daemon then saves something of its own.
+	s.recordOffDay("2026-07-01", prediction.Prediction{}, "")
+
+	final, _ := prediction.LoadHistory(h.dir)
+	if len(final.Predictions) != 3 || final.Predictions[0].GamePK != 1 {
+		t.Fatalf("backfill was clobbered: %+v", final.Predictions)
+	}
+}
+
+func TestReconcileTask_FillsMissingGamesOncePerDay(t *testing.T) {
+	h := newHarness(t)
+	h.now = denverAt(2026, 10, 6, 9, 0)
+	h.hist.Predictions = []prediction.PredictionRecord{
+		{Date: "2026-04-08", Opponent: "Houston Astros", GamePK: 3, Predicted: "L", Actual: "L", RockiesScore: 1, OppScore: 6},
+		{Date: "2026-10-05", Opponent: "Off Day", Predicted: "N/A"},
+	}
+	h.season.results = []mlb.GameResult{
+		{GamePk: 1, Date: "2026-03-27", Opponent: "Miami Marlins", Won: true, RockiesScore: 5, OppScore: 2},
+		{GamePk: 2, Date: "2026-03-28", Opponent: "Miami Marlins", Won: false, RockiesScore: 0, OppScore: 4},
+		{GamePk: 3, Date: "2026-04-08", Opponent: "Houston Astros", Won: false, RockiesScore: 1, OppScore: 6},
+	}
+	s := h.scheduler()
+
+	s.reconcileTask(2026, &tickResult{now: h.now})
+	sum := prediction.SummarizeSeason(h.hist.Predictions, 2026, h.hist.Current)
+	if sum.RockiesWins != 1 || sum.RockiesLosses != 2 || sum.Predictions != 1 {
+		t.Errorf("after reconcile: %d-%d, %d scored", sum.RockiesWins, sum.RockiesLosses, sum.Predictions)
+	}
+	saved, _ := prediction.LoadHistory(h.dir)
+	if len(saved.Predictions) != 4 {
+		t.Errorf("reconciled history not saved: %d records", len(saved.Predictions))
+	}
+
+	s.reconcileTask(2026, &tickResult{now: h.now})
+	if h.season.calls["results"] != 1 {
+		t.Errorf("reconcile should run once a day, ran %d times", h.season.calls["results"])
+	}
+
+	// A season already rolled into the archive is left alone.
+	h2 := newHarness(t)
+	h2.now = denverAt(2027, 2, 25, 9, 0)
+	h2.scheduler().reconcileTask(2026, &tickResult{now: h2.now})
+	if h2.season.calls["results"] != 0 {
+		t.Error("reconciled a season the live history no longer holds")
 	}
 }

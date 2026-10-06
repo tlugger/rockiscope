@@ -138,9 +138,13 @@ func (c *Client) GetGamesSince(date string) ([]GameResult, error) {
 
 // GetSeasonResults returns every completed regular-season Rockies game for the current season.
 func (c *Client) GetSeasonResults() ([]GameResult, error) {
-	season := c.now().Year()
+	return c.GetSeasonResultsFor(c.now().Year())
+}
+
+// GetSeasonResultsFor returns every completed regular-season Rockies game for a season.
+func (c *Client) GetSeasonResultsFor(season int) ([]GameResult, error) {
 	url := fmt.Sprintf("%s/schedule?sportId=1&teamId=%d&season=%d&gameType=R&hydrate=linescore",
-		baseURL, c.teamID, season)
+		c.base(), c.teamID, season)
 	var resp scheduleResponse
 	if err := c.getJSON(url, &resp); err != nil {
 		return nil, fmt.Errorf("fetching season schedule: %w", err)

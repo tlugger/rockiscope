@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"sort"
+	"time"
 	// Embed the timezone database so Denver time works even on a minimal OS image.
 	_ "time/tzdata"
 
@@ -185,62 +185,9 @@ func cmdBackfill(logger *log.Logger) {
 	}
 	logger.Printf("found %d completed regular-season games", len(results))
 
-	byGamePk := make(map[int]*prediction.PredictionRecord)
-	byDateOpp := make(map[string]*prediction.PredictionRecord)
-	for i := range hist.Predictions {
-		p := &hist.Predictions[i]
-		if p.GamePK != 0 {
-			byGamePk[p.GamePK] = p
-		}
-		byDateOpp[p.Date+"|"+p.Opponent] = p
-	}
-
-	var created, scoresFilled, actualsFilled int
-	for _, gr := range results {
-		existing := byGamePk[gr.GamePk]
-		if existing == nil {
-			existing = byDateOpp[gr.Date+"|"+gr.Opponent]
-		}
-		actual := "L"
-		if gr.Won {
-			actual = "W"
-		}
-
-		if existing != nil {
-			if existing.RockiesScore == 0 && existing.OppScore == 0 && (gr.RockiesScore != 0 || gr.OppScore != 0) {
-				existing.RockiesScore = gr.RockiesScore
-				existing.OppScore = gr.OppScore
-				scoresFilled++
-			}
-			if existing.Actual == "" {
-				existing.Actual = actual
-				actualsFilled++
-			}
-			if existing.GamePK == 0 && gr.GamePk != 0 {
-				existing.GamePK = gr.GamePk
-			}
-			continue
-		}
-
-		hist.Predictions = append(hist.Predictions, prediction.PredictionRecord{
-			Date:           gr.Date,
-			Opponent:       gr.Opponent,
-			IsHome:         gr.IsHome,
-			Predicted:      "L",
-			Confidence:     50,
-			Actual:         actual,
-			RockiesScore:   gr.RockiesScore,
-			OppScore:       gr.OppScore,
-			GamePK:         gr.GamePk,
-			WinProbability: 0.5,
-			Synthetic:      true,
-		})
-		created++
-	}
-
-	sort.SliceStable(hist.Predictions, func(i, j int) bool {
-		return hist.Predictions[i].Date < hist.Predictions[j].Date
-	})
+	// Leave the last couple of days alone so pending follow-up replies still fire.
+	protectFrom := time.Now().In(mlb.DenverLocation()).AddDate(0, 0, -2).Format("2006-01-02")
+	res := prediction.Reconcile(hist, results, protectFrom)
 
 	if fromBluesky {
 		username := os.Getenv("BLUESKY_USERNAME")
@@ -257,7 +204,8 @@ func cmdBackfill(logger *log.Logger) {
 	if err := prediction.SaveHistory(hist, dataDir); err != nil {
 		logger.Fatalf("saving history: %v", err)
 	}
-	logger.Printf("backfill complete: %d synthetic created, %d scores filled, %d actuals filled", created, scoresFilled, actualsFilled)
+	logger.Printf("backfill complete: %d synthetic created, %d scores filled, %d actuals filled", res.Created, res.ScoresFilled, res.ActualsFilled)
+	logger.Println("the running bot merges these changes on its next wake; no restart needed")
 }
 
 func cmdTestAuth(logger *log.Logger) {

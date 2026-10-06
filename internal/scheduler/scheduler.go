@@ -29,6 +29,9 @@ type Scheduler struct {
 	lastPostDate   string
 	lastReplyDate string
 	predHistory   *prediction.PredictionHistory
+	// historyModTime is the history file's mtime as of our last read or write.
+	// A different mtime means someone else (a `backfill` run) wrote it.
+	historyModTime time.Time
 
 	// season drives the postseason/offseason/spring modes. When nil the bot
 	// behaves exactly as it always has (regular-season logic year-round).
@@ -176,6 +179,7 @@ func loadPredictionHistory(s *Scheduler) {
 	}
 
 	s.predHistory = hist
+	s.historyModTime = s.historyFileModTime()
 	s.logger.Printf("prediction engine: %d games recorded, %d correct",
 		len(hist.Predictions), hist.CorrectCount())
 }
@@ -188,7 +192,46 @@ func (s *Scheduler) savePredictionHistory() error {
 	if s.predHistory == nil {
 		return nil
 	}
-	return prediction.SaveHistory(s.predHistory, s.dataDir)
+	// Never clobber records someone else wrote since we last looked.
+	s.syncHistoryFromDisk()
+	if err := prediction.SaveHistory(s.predHistory, s.dataDir); err != nil {
+		return err
+	}
+	s.historyModTime = s.historyFileModTime()
+	return nil
+}
+
+func (s *Scheduler) historyFileModTime() time.Time {
+	if s.dataDir == "" {
+		return time.Time{}
+	}
+	info, err := os.Stat(filepath.Join(s.dataDir, "prediction_history.json"))
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime()
+}
+
+// syncHistoryFromDisk merges in the history file if another process (the
+// `backfill` command) changed it while the daemon was running. Before this,
+// the daemon's next save silently overwrote every backfill.
+func (s *Scheduler) syncHistoryFromDisk() {
+	if s.dataDir == "" || s.predHistory == nil {
+		return
+	}
+	mod := s.historyFileModTime()
+	if mod.IsZero() || mod.Equal(s.historyModTime) {
+		return
+	}
+	disk, err := prediction.LoadHistory(s.dataDir)
+	if err != nil {
+		s.logger.Printf("warning: history changed on disk but couldn't be read: %v", err)
+		return
+	}
+	if n := s.predHistory.Merge(disk); n > 0 {
+		s.logger.Printf("merged %d records written to the history file by another process", n)
+	}
+	s.historyModTime = mod
 }
 
 func (s *Scheduler) Run() {
@@ -220,6 +263,8 @@ func (s *Scheduler) iterate() (sleepDur time.Duration) {
 		return time.Minute
 	}
 
+	s.syncHistoryFromDisk()
+
 	phase := s.CurrentPhase()
 	s.logger.Printf("phase: %s", phase)
 	s.recordStatus(phase)
@@ -232,6 +277,7 @@ func (s *Scheduler) iterate() (sleepDur time.Duration) {
 	// offline (or installed) after Opening Day.
 	rr := &tickResult{now: s.denverNow()}
 	s.rolloverTask(phase.Season, rr)
+	s.reconcileTask(phase.Season, rr)
 	if err := rr.err(); err != nil {
 		s.logger.Printf("warning: %v", err)
 	}

@@ -86,9 +86,11 @@ func (s *Scheduler) runSeasonalTasks(p PhaseInfo) *tickResult {
 		if err := s.checkForCompletedGames(); err != nil {
 			s.logger.Printf("warning: could not check completed games: %v", err)
 		}
+		s.reconcileTask(p.Season, r)
 		s.reportCardTask(p.Season, r)
 		s.postseasonTask(p.Season, r)
 	case PhaseOffseason:
+		s.reconcileTask(p.Season, r)
 		s.reportCardTask(p.Season, r)
 		if s.postseasonNeedsWrapUp(p.Season) {
 			s.postseasonTask(p.Season, r)
