@@ -42,7 +42,7 @@ func TestReportCard(t *testing.T) {
 		assertFits(t, "report card post", p)
 		_ = i
 	}
-	for _, want := range []string{"58-104", "97/150", "Pessimism: rewarded", "Better than the lineup"} {
+	for _, want := range []string{"58-104", "97/150", "Pessimism: a lifestyle", "Better than the lineup"} {
 		if !strings.Contains(posts[0], want) {
 			t.Errorf("post 1 missing %q:\n%s", want, posts[0])
 		}

@@ -221,9 +221,19 @@ func (p Prediction) FactorScores() FactorScores {
 
 // FormatPrediction returns a human-readable prediction string.
 func (p Prediction) FormatPrediction() string {
-	pct := p.WinProbability * 100
-	if p.Pick == "W" {
-		return fmt.Sprintf("%s a Rockies victory (%.0f%%)", p.Confidence, pct)
+	return p.FormatFor("Rockies")
+}
+
+// FormatFor phrases the prediction for any team: "The stars lean toward a
+// Padres defeat (70%)".
+func (p Prediction) FormatFor(team string) string {
+	lead := p.Confidence
+	// The coin-flip phrase is the one label that doesn't end in a verb.
+	if lead == "A cosmic coin flip" {
+		lead += ", leaning toward"
 	}
-	return fmt.Sprintf("%s a Rockies defeat (%.0f%%)", p.Confidence, 100-pct)
+	if p.Pick == "W" {
+		return fmt.Sprintf("%s a %s victory (%.0f%%)", lead, team, p.WinProbability*100)
+	}
+	return fmt.Sprintf("%s a %s defeat (%.0f%%)", lead, team, 100-p.WinProbability*100)
 }

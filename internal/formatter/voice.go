@@ -45,7 +45,7 @@ func fitting(order []string, render func(on map[string]bool) string) string {
 
 const (
 	minQuote = 14
-	maxQuote = 48
+	maxQuote = 55
 )
 
 // horoscopeQuote pulls a short, quotable clause out of today's horoscope:
@@ -55,14 +55,37 @@ func horoscopeQuote(text string, seed int) string {
 	for _, sentence := range splitSentences(text) {
 		for _, clause := range splitClauses(sentence) {
 			clause = strings.TrimSpace(strings.TrimRight(clause, ".!?,;: "))
-			n := utf8.RuneCountInString(clause)
-			if n < minQuote || n > maxQuote || strings.Contains(clause, "Rockies") || strings.Contains(clause, "Cancer") {
-				continue
+			// ", but you won't..." quotes better without its conjunction.
+			for _, c := range []string{"but ", "and ", "But ", "And "} {
+				clause = strings.TrimPrefix(clause, c)
 			}
-			quotes = append(quotes, lowerFirst(clause))
+			if quotable(clause) {
+				quotes = append(quotes, lowerFirst(clause))
+			}
 		}
 	}
 	return pick(quotes, seed)
+}
+
+// fragmentOpeners start clauses that only make sense attached to the
+// sentence they came from ("not even those closest to you").
+var fragmentOpeners = []string{"not ", "which ", "who ", "that ", "or ", "nor ", "like ", "so ", "as ", "than ", "because ", "when ", "if ", "even ", "is ", "isn't ", "are ", "aren't ", "was ", "were "}
+
+// quotable: a short clause that stands on its own, like "slam the door
+// today" or "you might enjoy this day by being lazy".
+func quotable(clause string) bool {
+	n := utf8.RuneCountInString(clause)
+	if n < minQuote || n > maxQuote || len(strings.Fields(clause)) < 3 ||
+		strings.Contains(clause, "Rockies") || strings.Contains(clause, "Cancer") {
+		return false
+	}
+	lower := strings.ToLower(clause)
+	for _, f := range fragmentOpeners {
+		if strings.HasPrefix(lower, f) {
+			return false
+		}
+	}
+	return true
 }
 
 func splitSentences(text string) []string {
@@ -84,7 +107,7 @@ func splitSentences(text string) []string {
 // compound sentences, where a quote still reads as a complete thought.
 func splitClauses(sentence string) []string {
 	parts := []string{sentence}
-	for _, sep := range []string{"; ", ", ", " but ", " and ", " so "} {
+	for _, sep := range []string{"; ", ", ", " but ", " and "} {
 		var next []string
 		for _, p := range parts {
 			next = append(next, strings.Split(p, sep)...)
@@ -116,37 +139,37 @@ func isSkyWord(w string) bool {
 
 var roastGameDay = []string{
 	"The bullpen took that personally.",
-	"Noted. Forwarding to the lineup.",
-	"The stars wrote that specifically about the seventh inning.",
-	"Read that again, but in a dugout.",
-	"Unclear if that applies to the bullpen. Assuming yes.",
+	"Forwarding to the lineup.",
 	"Somebody tell the leadoff hitter.",
-	"Saturn would like that framed in the clubhouse.",
+	"Read that again, in a dugout.",
+	"The seventh inning felt that.",
+	"Saturn wants it framed.",
+	"Noted, bullpen.",
 }
 
 var roastOffDay = []string{
-	"On an off day? Finally, advice we can follow.",
-	"The Rockies are taking this extremely literally.",
-	"Somewhere a reliever is reading this and nodding.",
-	"No game to ruin it. A rare clean reading.",
-	"Saving this one for the next homestand.",
+	"Finally, advice we can follow.",
+	"Taking that extremely literally.",
+	"A reliever just nodded.",
+	"No game to ruin it.",
+	"Saving it for the homestand.",
 }
 
 var roastCountdown = []string{
-	"That's the energy we're bringing to Opening Day.",
-	"Pinning this in the clubhouse until spring.",
-	"The front office has been notified. They did not reply.",
-	"Words to live by. Words to rebuild by.",
+	"That's our Opening Day energy.",
+	"Pinned in the clubhouse.",
+	"Words to rebuild by.",
+	"The front office left it on read.",
 }
 
 // horoscopeRoast is one line quoting today's horoscope back at us, e.g.
-// `📜 Today's horoscope: "you might enjoy this day by being lazy." Noted.`
+// `📜 Horoscope: "you might enjoy this day by being lazy." Noted, bullpen.`
 func horoscopeRoast(text string, seed int, reactions []string) string {
 	q := horoscopeQuote(text, seed)
 	if q == "" {
 		return ""
 	}
-	return fmt.Sprintf("📜 Today's horoscope: \"%s.\" %s", q, pick(reactions, seed/3))
+	return fmt.Sprintf("📜 Horoscope: \"%s.\" %s", q, pick(reactions, seed/3))
 }
 
 // ── Pregame nuggets ──────────────────────────────────────────────────

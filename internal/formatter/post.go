@@ -45,7 +45,7 @@ func FormatGameDay(p GameDayPost) Post {
 		horoText = p.Horoscope.Text
 	}
 
-	text := fitting([]string{"kicker", "roast", "pitcher", "record", "venue"}, func(on map[string]bool) string {
+	text := fitting([]string{"roast", "kicker", "pitcher", "record", "venue"}, func(on map[string]bool) string {
 		var b strings.Builder
 		location := "vs"
 		if !p.Game.IsHome {
@@ -128,7 +128,7 @@ func FormatOffDay(p OffDayPost) Post {
 		b.WriteString("\n")
 
 		if p.Record != nil {
-			line := fmt.Sprintf("📊 %d-%d (%.3f)", p.Record.Wins, p.Record.Losses, p.Record.WinningPercentage)
+			line := fmt.Sprintf("📊 %d-%d (%s)", p.Record.Wins, p.Record.Losses, strings.TrimPrefix(fmt.Sprintf("%.3f", p.Record.WinningPercentage), "0"))
 			if p.Record.RunDifferential >= 0 {
 				line += fmt.Sprintf(" | Run Diff: +%d", p.Record.RunDifferential)
 			} else {
