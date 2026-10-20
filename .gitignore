@@ -4,6 +4,7 @@ rockiscope
 sample_card.png
 prediction_history.json
 season_state.json
+live_threads.json
 *.bak
 archive/
 backups/

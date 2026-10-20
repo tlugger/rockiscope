@@ -42,6 +42,9 @@ type Scheduler struct {
 	// ignoreTimeGates posts seasonal content immediately instead of waiting
 	// for its window (preview and the manual `post` command).
 	ignoreTimeGates bool
+	// live runs in-game threads between the pregame post and the result.
+	// Nil (preview, one-off commands) means no live updates.
+	live LiveThreads
 }
 
 type Config struct {
@@ -52,6 +55,7 @@ type Config struct {
 	Logger    *log.Logger
 	DataDir   string
 	DryRun    bool
+	Live      LiveThreads
 }
 
 func New(cfg Config) *Scheduler {
@@ -65,6 +69,7 @@ func New(cfg Config) *Scheduler {
 		dataDir:   cfg.DataDir,
 		season:    cfg.Season,
 		dryRun:    cfg.DryRun,
+		live:      cfg.Live,
 	}
 	loadLastPostDate(s)
 	loadLastReplyDate(s)
@@ -416,8 +421,10 @@ func (s *Scheduler) tick() error {
 					return err
 				}
 				anyGamePosted = true
+				s.registerRegularLive(game)
 				continue
 			}
+			s.registerRegularLive(game)
 
 			s.logger.Printf("game %d already posted, skipping", game.GamePk)
 		}
@@ -786,6 +793,12 @@ func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) bool {
 		// double-headers (two games share a date+opponent) and never matches a
 		// postponed makeup (its date differs from the original prediction).
 		if gr.GamePk != 0 && p.GamePK == gr.GamePk {
+			// The result continues the live thread, so let it finish first.
+			wrap, ready := s.liveWrapUp(gr.GamePk)
+			if !ready {
+				s.logger.Printf("game %d is final; waiting for its live thread to finish", gr.GamePk)
+				return false
+			}
 			// Re-date to the official date in case this game was postponed and
 			// made up on a different day than originally predicted.
 			if gr.Date != "" {
@@ -810,9 +823,14 @@ func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) bool {
 			score := fmt.Sprintf("Colorado Rockies %d-%d %s",
 				gr.RockiesScore, gr.OppScore, p.Opponent)
 
-			if err := s.postFollowUp(p.PostURI, correct, actual, score, record); err != nil {
+			parent := p.PostURI
+			if wrap.ParentURI != "" {
+				parent = wrap.ParentURI
+			}
+			if err := s.postFollowUp(parent, p.PostURI, wrap.Chart, correct, actual, score, record); err != nil {
 				s.logger.Printf("warning: could not post follow-up: %v", err)
 			} else {
+				s.liveFinish(gr.GamePk)
 				p.Actual = actual
 				p.RockiesScore = gr.RockiesScore
 				p.OppScore = gr.OppScore
@@ -828,7 +846,9 @@ func (s *Scheduler) processCompletedGame(gr mlb.GameResult, today string) bool {
 	return found
 }
 
-func (s *Scheduler) postFollowUp(parentURI string, correct bool, actual, score, record string) error {
+// postFollowUp replies with the result: to the last live update when there
+// was a live thread (rootURI is always the pregame post).
+func (s *Scheduler) postFollowUp(parentURI, rootURI string, chart *bluesky.ImageData, correct bool, actual, score, record string) error {
 	outcome := fmt.Sprintf("Rockies %s", actual)
 
 	text := formatter.FormatFollowUp(formatter.FollowUp{
@@ -838,7 +858,7 @@ func (s *Scheduler) postFollowUp(parentURI string, correct bool, actual, score, 
 		Record:  record,
 	})
 
-	_, err := s.poster.Reply(text, nil, parentURI, parentURI)
+	_, err := s.poster.Reply(text, chart, parentURI, rootURI)
 	if err != nil {
 		return fmt.Errorf("posting follow-up: %w", err)
 	}

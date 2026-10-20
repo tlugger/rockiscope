@@ -12,6 +12,7 @@ import (
 
 	"github.com/tlugger/rockiscope/internal/bluesky"
 	"github.com/tlugger/rockiscope/internal/horoscope"
+	"github.com/tlugger/rockiscope/internal/live"
 	"github.com/tlugger/rockiscope/internal/mlb"
 	"github.com/tlugger/rockiscope/internal/prediction"
 	"github.com/tlugger/rockiscope/internal/scheduler"
@@ -102,7 +103,18 @@ func cmdRun(logger *log.Logger) {
 
 	username, password := requireCreds(logger)
 	poster := bluesky.NewClient(username, password, logger)
-	sched := newScheduler(logger, poster)
+
+	// Live game threads run beside the scheduler. Their state is on disk, so
+	// after a crash or power cut the supervisor resumes any game in progress.
+	liveThreads := live.NewManager(live.Config{
+		MLB:     mlb.NewClient(nil, logger),
+		Poster:  poster,
+		Logger:  logger,
+		DataDir: dataDir,
+	})
+	go liveThreads.Run()
+
+	sched := newSchedulerWith(logger, poster, false, liveThreads)
 	sched.Run()
 }
 
@@ -146,14 +158,14 @@ func cmdPreview(logger *log.Logger) {
 			fmt.Printf("─── Image: %d bytes ───\n", len(b))
 		},
 	}
-	sched := newSchedulerWith(logger, poster, true)
+	sched := newSchedulerWith(logger, poster, true, nil)
 	if err := sched.RunOnce(); err != nil {
 		logger.Fatalf("preview failed: %v", err)
 	}
 }
 
 func cmdPhase(logger *log.Logger) {
-	sched := newSchedulerWith(logger, &bluesky.DryRunPoster{}, true)
+	sched := newSchedulerWith(logger, &bluesky.DryRunPoster{}, true, nil)
 	p := sched.CurrentPhase()
 	fmt.Printf("Phase:  %s\n", p.Phase)
 	fmt.Printf("Season: %d\n", p.Season)
@@ -273,12 +285,13 @@ func cmdTestHoro(logger *log.Logger) {
 }
 
 func newScheduler(logger *log.Logger, poster bluesky.Poster) *scheduler.Scheduler {
-	return newSchedulerWith(logger, poster, false)
+	return newSchedulerWith(logger, poster, false, nil)
 }
 
-func newSchedulerWith(logger *log.Logger, poster bluesky.Poster, dryRun bool) *scheduler.Scheduler {
+// newSchedulerWith builds a scheduler; liveThreads may be nil (no live updates).
+func newSchedulerWith(logger *log.Logger, poster bluesky.Poster, dryRun bool, liveThreads *live.Manager) *scheduler.Scheduler {
 	client := mlb.NewClient(nil, logger)
-	return scheduler.New(scheduler.Config{
+	cfg := scheduler.Config{
 		MLB:       client,
 		Season:    client,
 		Horoscope: horoscope.NewScraper(nil, logger),
@@ -286,7 +299,12 @@ func newSchedulerWith(logger *log.Logger, poster bluesky.Poster, dryRun bool) *s
 		Logger:    logger,
 		DataDir:   getDataDir(),
 		DryRun:    dryRun,
-	})
+	}
+	// Assigned only when set: a nil *live.Manager in the interface isn't nil.
+	if liveThreads != nil {
+		cfg.Live = liveThreads
+	}
+	return scheduler.New(cfg)
 }
 
 func getDataDir() string {

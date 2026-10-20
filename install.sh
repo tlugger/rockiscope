@@ -69,7 +69,7 @@ fi
 # Upgrades never touch these files, but a copy costs nothing and the season's
 # prediction history can't be regenerated.
 
-DATA_FILES=(prediction_history.json season_state.json last_post_date last_reply_date archive)
+DATA_FILES=(prediction_history.json season_state.json live_threads.json last_post_date last_reply_date archive)
 EXISTING=()
 for f in "${DATA_FILES[@]}"; do
   [ -e "$INSTALL_DIR/$f" ] && EXISTING+=("$f")
