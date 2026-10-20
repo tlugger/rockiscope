@@ -44,9 +44,9 @@ func TestFormatGameDay(t *testing.T) {
 		t.Errorf("missing prediction:\n%s", result.Text)
 	}
 
-	// Horoscope should be separate, not in text
-	if strings.Contains(result.Text, "stars align") {
-		t.Errorf("horoscope should not be in text:\n%s", result.Text)
+	// The full horoscope goes on the image card; the post only quotes a line.
+	if !strings.Contains(result.Text, "📜 Horoscope: \"the stars align for an unexpected victory today.\"") {
+		t.Errorf("missing the horoscope roast:\n%s", result.Text)
 	}
 	if result.HoroscopeText != "The stars align for an unexpected victory today." {
 		t.Errorf("horoscope text = %q", result.HoroscopeText)

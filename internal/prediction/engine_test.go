@@ -235,3 +235,14 @@ func TestFormatPrediction(t *testing.T) {
 		t.Errorf("format = %q", s2)
 	}
 }
+
+func TestFormatPrediction_CoinFlipGrammar(t *testing.T) {
+	p := Prediction{WinProbability: 0.53, Pick: "W", Confidence: "A cosmic coin flip"}
+	if got := p.FormatPrediction(); got != "A cosmic coin flip, leaning toward a Rockies victory (53%)" {
+		t.Errorf("got %q", got)
+	}
+	p = Prediction{WinProbability: 0.3, Pick: "L", Confidence: "The stars lean toward"}
+	if got := p.FormatFor("Padres"); got != "The stars lean toward a Padres defeat (70%)" {
+		t.Errorf("got %q", got)
+	}
+}

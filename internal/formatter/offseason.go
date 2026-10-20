@@ -88,19 +88,19 @@ func ReportCard(s prediction.SeasonSummary) []string {
 	var posts []string
 
 	acc := s.Accuracy
-	verdict := "A coin would have beaten us. The coin declined to comment."
+	verdict := "A coin would have beaten us. The coin has asked not to be contacted."
 	switch {
 	case acc >= 0.60:
-		verdict = "Better than the lineup."
+		verdict = "Better than the lineup. Better than most of the front office."
 	case acc >= 0.50:
-		verdict = "Better than a coin flip. Barely. We'll take it."
+		verdict = "Better than a coin flip. Barely. The coin is filing an appeal."
 	}
 	pessimism := ""
 	if s.PickedLosses > s.PickedWins {
-		pessimism = fmt.Sprintf("\n📉 Picked them to lose %d times. Pessimism: rewarded.", s.PickedLosses)
+		pessimism = fmt.Sprintf("\n📉 Picked them to lose %d times. Pessimism: a lifestyle.", s.PickedLosses)
 	}
 	posts = append(posts, fmt.Sprintf(
-		"📜 The %d Rockiscope Report Card\n\n⚾ Rockies: %d-%d. The stars watched every one.\n🔮 Predictions: %d/%d correct (%s)%s\n\n%s 🧵",
+		"📜 The %d Rockiscope Report Card\n\n⚾ Rockies: %d-%d. The stars watched every one. Some twice, for therapy.\n🔮 Predictions: %d/%d correct (%s)%s\n\n%s 🧵",
 		s.Season, s.RockiesWins, s.RockiesLosses, s.Correct, s.Predictions, pct(acc), pessimism, verdict))
 
 	type row struct {
@@ -122,7 +122,7 @@ func ReportCard(s prediction.SeasonSummary) []string {
 		}
 		if stars, ok := s.FactorSamples["stars"]; ok && stars >= 5 {
 			if s.FactorAccuracy["stars"] > 0.5 {
-				b.WriteString("\nThe stars beat a coin flip. Science is in shambles.")
+				b.WriteString("\nThe stars beat a coin flip. Science is in shambles. Peer review is cancelled.")
 			} else {
 				b.WriteString("\nThe stars missed more than they hit. Still more consistent than the bullpen.")
 			}
@@ -141,9 +141,9 @@ func ReportCard(s prediction.SeasonSummary) []string {
 		fmt.Fprintf(&b, "%s: %s %s %s\n", factorNames[f], pct(from), arrow, pct(to))
 	}
 	if s.FinalWeights.Stars > s.StartWeights.Stars+0.005 {
-		b.WriteString("\nThe machine is becoming a believer.")
+		b.WriteString("\nThe machine is becoming a believer. It has started burning sage.")
 	} else if s.FinalWeights.Stars < s.StartWeights.Stars-0.005 {
-		b.WriteString("\nThe machine has lost its faith.")
+		b.WriteString("\nThe machine has lost its faith. We're praying for it, ironically.")
 	}
 	posts = append(posts, strings.TrimSpace(b.String()))
 
@@ -159,7 +159,7 @@ func ReportCard(s prediction.SeasonSummary) []string {
 	if s.LongestCorrectStreak > 0 {
 		fmt.Fprintf(&b, "🔥 Longest correct streak: %d\n", s.LongestCorrectStreak)
 	}
-	b.WriteString("\nThe model goes into hibernation now. Unlike the bullpen, it'll be back. 🏔️")
+	b.WriteString("\nThe model goes into hibernation now. It'll be back. The bullpen remains under review. 🏔️")
 	posts = append(posts, strings.TrimSpace(b.String()))
 
 	for i := range posts {
@@ -181,13 +181,13 @@ type Adoption struct {
 
 func FormatAdoption(a Adoption) string {
 	if a.AdoptingItself {
-		return Fit(fmt.Sprintf("🏔️ The Rockies are in the postseason. Rockiscope is adopting... the Rockies.\n\n%s\n\nPlease check that this is not a dream.", a.Reading.Summary()), MaxPostLength)
+		return Fit(fmt.Sprintf("🏔️ The Rockies are in the postseason. Rockiscope is adopting... the Rockies.\n\n%s\n\nSomeone pinch me. Gently. Then check the standings again.", a.Reading.Summary()), MaxPostLength)
 	}
 	var b strings.Builder
 	if a.PreviousTeam != "" {
-		fmt.Fprintf(&b, "🪦 The %s have been eliminated. Adoption dissolved. We were warned.\n\n", Nickname(a.PreviousTeam))
+		fmt.Fprintf(&b, "🪦 The %s have been eliminated. Adoption dissolved. Their stuff is on the lawn.\n\n", Nickname(a.PreviousTeam))
 		fmt.Fprintf(&b, "🔭 Next most compatible roster: the %s.\n", a.TeamName)
-		fmt.Fprintf(&b, "%s\n♋ Dominant sign: %s\n\nPlease don't make this weird.", a.Reading.Summary(), a.Reading.Dominant)
+		fmt.Fprintf(&b, "%s\n♋ Dominant sign: %s\n\nWe've done this before. Please don't make it weird.", a.Reading.Summary(), a.Reading.Dominant)
 		return Fit(b.String(), MaxPostLength)
 	}
 	b.WriteString("🍼 The Rockies are out")
@@ -214,53 +214,75 @@ type AdoptedGame struct {
 }
 
 func FormatAdoptedGame(g AdoptedGame) Post {
-	var b strings.Builder
-	fmt.Fprintf(&b, "🍼 Adopted team watch: %s\n", g.SeriesShort)
-	loc := "vs"
-	if !g.IsHome {
-		loc = "@"
-	}
-	fmt.Fprintf(&b, "⚾ %s %s %s\n", g.TeamName, loc, g.Opponent)
-	fmt.Fprintf(&b, "🕐 %s at %s\n", g.GameTime, g.Venue)
-	if g.SeriesResult != "" {
-		fmt.Fprintf(&b, "📈 %s\n", g.SeriesResult)
-	}
-	if g.Pitcher != "" {
-		fmt.Fprintf(&b, "🪖 %s\n", g.Pitcher)
-	}
-	b.WriteString("\n🔮 ")
-	b.WriteString(TeamPrediction(g.Prediction, Nickname(g.TeamName)))
-	return Post{Text: Fit(b.String(), MaxPostLength), HoroscopeText: g.HoroscopeText, Prediction: g.Prediction}
+	seed := seedOf(g.TeamName, g.SeriesShort, g.GameTime)
+	text := fitting([]string{"roast", "kicker", "series"}, func(on map[string]bool) string {
+		var b strings.Builder
+		fmt.Fprintf(&b, "🍼 Adopted team watch: %s\n", g.SeriesShort)
+		loc := "vs"
+		if !g.IsHome {
+			loc = "@"
+		}
+		fmt.Fprintf(&b, "⚾ %s %s %s\n", g.TeamName, loc, g.Opponent)
+		fmt.Fprintf(&b, "🕐 %s at %s\n", g.GameTime, g.Venue)
+		if g.SeriesResult != "" {
+			line := "📈 " + g.SeriesResult
+			if on["series"] {
+				line = withQuip(line+".", pick(seriesQuips, seed))
+			}
+			b.WriteString(line + "\n")
+		}
+		if g.Pitcher != "" {
+			fmt.Fprintf(&b, "🪖 %s\n", g.Pitcher)
+		}
+		if r := horoscopeRoast(g.HoroscopeText, seed, roastGameDay); on["roast"] && r != "" {
+			b.WriteString(r + "\n")
+		}
+		b.WriteString("\n🔮 ")
+		b.WriteString(TeamPrediction(g.Prediction, Nickname(g.TeamName)))
+		if on["kicker"] {
+			b.WriteString("\n" + predictionKicker(g.Prediction.WinProbability, seed))
+		}
+		return b.String()
+	})
+	return Post{Text: text, HoroscopeText: g.HoroscopeText, Prediction: g.Prediction}
+}
+
+var seriesQuips = []string{
+	"The stars have read ahead.",
+	"Every game is an elimination game if you believe hard enough.",
+	"October is a state of mind.",
+	"We are emotionally invested in a team we met last week.",
 }
 
 // TeamPrediction is Prediction.FormatPrediction for a team other than the Rockies.
 func TeamPrediction(p prediction.Prediction, team string) string {
-	if p.Pick == "W" {
-		return fmt.Sprintf("%s a %s victory (%.0f%%)", p.Confidence, team, p.WinProbability*100)
-	}
-	return fmt.Sprintf("%s a %s defeat (%.0f%%)", p.Confidence, team, 100-p.WinProbability*100)
+	return p.FormatFor(team)
 }
 
 var adoptedFollowUps = map[string][]string{
 	"WW": {
-		"✨ Called it. Our adopted child did us proud.",
-		"🍼 The stars said win. The kid listened.",
-		"🔮 Correct pick AND a win? So this is what that feels like.",
+		"✨ Called it. Our adopted child did us proud. Putting this one on the fridge.",
+		"🍼 The stars said win. The kid listened. Better listener than our real kid.",
+		"🔮 Correct pick AND a win? So this is what October feels like.",
+		"🏅 A cosmic W for the adoptee. We're telling everyone at work.",
 	},
 	"WL": {
-		"🫠 The stars doubted them. We'll keep that between us.",
-		"🍀 Wrong pick, right result. Parenting is hard.",
-		"🌈 We had no faith and were rewarded anyway.",
+		"🫠 The stars doubted them. We'll keep that between us and the cosmos.",
+		"🍀 Wrong pick, right result. Parenting is hard. Astrology is harder.",
+		"🌈 We had no faith and were rewarded anyway. Don't tell the stars.",
+		"🙈 Bet against our own adopted team. They won. We're in the doghouse.",
 	},
 	"LL": {
-		"📉 Called it. We've seen this movie. We starred in it.",
-		"🌑 The stars warned us. Feels like home.",
+		"📉 Called it. We've seen this movie. We starred in it for years.",
+		"🌑 The stars warned us. It feels like home.",
 		"🏔️ A loss we saw coming. They're really one of us now.",
+		"💀 Correct, and devastating. The adoption agency has questions.",
 	},
 	"LW": {
 		"💔 The stars believed. That was the mistake.",
-		"🫠 Wrong pick, worse result. Welcome to the family.",
-		"🌘 Mercury entered their bullpen mid-game.",
+		"🫠 Wrong pick, worse result. Welcome to the family. Sorry.",
+		"🌘 Mercury entered their bullpen in the middle innings.",
+		"🧸 We believed in you, adopted team. That's on us now.",
 	},
 }
 
@@ -313,7 +335,7 @@ func FormatChampion(c Champion) string {
 	var b strings.Builder
 	if c.AdoptedWon {
 		fmt.Fprintf(&b, "🏆 The %s are World Series champions.\n\n", c.Champion)
-		fmt.Fprintf(&b, "Rockiscope adopted them on %s. We're not saying the stars did this. We're not not saying it.\n", shortDate(c.AdoptedOn))
+		fmt.Fprintf(&b, "Rockiscope adopted them on %s. We're not saying the stars did this. We're not not saying it. The ring size is a 9.\n", shortDate(c.AdoptedOn))
 	} else {
 		fmt.Fprintf(&b, "🏆 The %s win the World Series.\n\n", c.Champion)
 		if len(c.Adopted) > 0 {
@@ -321,13 +343,13 @@ func FormatChampion(c Champion) string {
 			for i, a := range c.Adopted {
 				names[i] = Nickname(a)
 			}
-			fmt.Fprintf(&b, "Rockiscope's adoptions this October: %s. All eliminated. The agency has been notified.\n", strings.Join(names, ", "))
+			fmt.Fprintf(&b, "Rockiscope's adoptions this October: %s. All eliminated. The agency has revoked our license.\n", strings.Join(names, ", "))
 		}
 	}
 	if c.PicksRecord != "" {
 		fmt.Fprintf(&b, "🎯 Postseason picks: %s\n", c.PicksRecord)
 	}
-	b.WriteString("\n🔥 Hot stove season starts now. 🏔️")
+	b.WriteString("\n🔥 Hot stove season starts now. Every team is undefeated again, including ours. 🏔️")
 	return Fit(b.String(), MaxPostLength)
 }
 
@@ -361,25 +383,40 @@ func FormatTransaction(t TransactionPost) string {
 
 	sign, ok := astro.SignFor(t.BirthDate)
 	if !ok {
-		b.WriteString("🔭 Birth chart unavailable. Proceeding on vibes.")
+		b.WriteString("🔭 Birth chart unavailable. Proceeding on vibes. Vibes are cautiously suspicious.")
 		return Fit(b.String(), MaxPostLength)
 	}
 	first := t.PlayerName
 	if i := strings.Index(first, " "); i > 0 {
 		first = first[:i]
 	}
-	fmt.Fprintf(&b, "%s %s is a %s. %s\n", sign.Emoji(), first, sign.Name(), sign.Trait())
+	fmt.Fprintf(&b, "%s %s is %s. %s\n", sign.Emoji(), first, withArticle(sign), sign.Trait())
 	if t.Arriving {
-		fmt.Fprintf(&b, "♋ Rockies compatibility: %s.", astro.CompatibilityLabel(sign.Compatibility()))
+		fmt.Fprintf(&b, "♋ Rockies compatibility: %s. %s", astro.CompatibilityLabel(sign.Compatibility()), pick(arrivalQuips[sign.Compatibility()], seedOf(t.Description)))
 	} else {
-		b.WriteString("♋ Compatibility: no longer our problem.")
+		fmt.Fprintf(&b, "♋ Compatibility: no longer our problem. %s", pick(departureQuips, seedOf(t.Description)))
 	}
 	return Fit(b.String(), MaxPostLength)
 }
 
+// arrivalQuips react to a new Rockie by Cancer compatibility (0-3).
+var arrivalQuips = [4][]string{
+	{"The stars have filed a formal objection.", "We'll light a candle.", "Mercury is already drafting the trade request."},
+	{"Couples therapy recommended.", "It could work. It won't, but it could.", "Proceed with mild cosmic caution."},
+	{"A respectable match. Don't ruin it.", "The stars nod politely.", "Cautiously compatible."},
+	{"Soulmates. The front office accidentally did astrology.", "Welcome home. Bring tissues.", "Destiny, signed through arbitration."},
+}
+
+var departureQuips = []string{
+	"The stars wish them well. Mostly.",
+	"Thank you for your service. And your ERA.",
+	"Off to find themselves at sea level.",
+	"May the thin air never haunt them.",
+}
+
 func FormatTransactionDigest(descriptions []string) string {
 	var b strings.Builder
-	fmt.Fprintf(&b, "📋 Hot stove roundup, %d more moves:\n", len(descriptions))
+	fmt.Fprintf(&b, "📋 Hot stove roundup, %d more moves. The front office has been busy, or at least typing:\n", len(descriptions))
 	for _, d := range descriptions {
 		fmt.Fprintf(&b, "\n• %s", d)
 	}
@@ -389,14 +426,16 @@ func FormatTransactionDigest(descriptions []string) string {
 // ── Opening Day countdown ────────────────────────────────────────────
 
 var countdownQuips = []string{
-	"Every team is undefeated right now. Even us.",
+	"Every team is undefeated right now. Even us. Especially us.",
 	"The bullpen hasn't blown a lead in months. Personal best.",
 	"Mercury will go retrograde before then. Plan accordingly.",
 	"Somewhere, a reliever is throwing into a net and feeling great about it.",
-	"Projection systems are warming up their 100-loss takes.",
+	"Projection systems are warming up their 100-loss takes. Rude, but fair.",
 	"Coors Field is under snow. So are expectations.",
 	"Hope springs eternal. It also springs a leak by May.",
-	"The stars are studying film. They don't like what they see.",
+	"The stars are studying film. They've asked for a translator.",
+	"Hibernation update: the model is dreaming of a .500 season.",
+	"Saturn has been consulted about the rotation. Saturn sighed.",
 }
 
 var finalWeekQuips = []string{
@@ -404,6 +443,7 @@ var finalWeekQuips = []string{
 	"The stars are stretching. Hamstrings look questionable.",
 	"Last chance to believe in something. Choose wisely.",
 	"Clear your schedule. And your expectations.",
+	"The crystals are charged. The bullpen is not.",
 }
 
 type Countdown struct {
@@ -441,10 +481,19 @@ func FormatCountdown(c Countdown) Post {
 		quips = finalWeekQuips
 	}
 	fmt.Fprintf(&b, "\n%s", quips[c.Days%len(quips)])
-	if c.HoroscopeText != "" {
-		b.WriteString("\n\n🔮 Today's reading is attached.")
-	}
-	return Post{Text: Fit(b.String(), MaxPostLength), HoroscopeText: c.HoroscopeText}
+	head := b.String()
+	text := fitting([]string{"roast"}, func(on map[string]bool) string {
+		t := head
+		if c.HoroscopeText != "" {
+			if r := horoscopeRoast(c.HoroscopeText, seedOf(c.OpeningDay, c.Days), roastCountdown); on["roast"] && r != "" {
+				t += "\n\n" + r
+			} else {
+				t += "\n\n🔮 Today's reading is attached."
+			}
+		}
+		return t
+	})
+	return Post{Text: text, HoroscopeText: c.HoroscopeText}
 }
 
 // ── Spring training ──────────────────────────────────────────────────
@@ -460,26 +509,43 @@ type SpringGame struct {
 }
 
 func FormatSpringGame(g SpringGame) Post {
-	var b strings.Builder
-	b.WriteString("🌵 Spring Training. It doesn't count. Neither does this.\n")
-	loc := "vs"
-	if !g.IsHome {
-		loc = "@"
-	}
-	fmt.Fprintf(&b, "⚾ Rockies %s %s\n", loc, g.Opponent)
-	fmt.Fprintf(&b, "🕐 %s at %s\n", g.GameTime, g.Venue)
-	if g.SpringRecord != "" {
-		fmt.Fprintf(&b, "📊 Spring: %s\n", g.SpringRecord)
-	}
-	b.WriteString("\n🔮 ")
-	b.WriteString(g.Prediction.FormatPrediction())
-	return Post{Text: Fit(b.String(), MaxPostLength), HoroscopeText: g.HoroscopeText, Prediction: g.Prediction}
+	seed := seedOf("spring", g.Opponent, g.GameTime, g.SpringRecord)
+	text := fitting([]string{"roast", "kicker"}, func(on map[string]bool) string {
+		var b strings.Builder
+		b.WriteString("🌵 Spring Training. It doesn't count. Neither does this.\n")
+		loc := "vs"
+		if !g.IsHome {
+			loc = "@"
+		}
+		fmt.Fprintf(&b, "⚾ Rockies %s %s\n", loc, g.Opponent)
+		fmt.Fprintf(&b, "🕐 %s at %s\n", g.GameTime, g.Venue)
+		if g.SpringRecord != "" {
+			fmt.Fprintf(&b, "📊 Spring: %s\n", g.SpringRecord)
+		}
+		if r := horoscopeRoast(g.HoroscopeText, seed, roastGameDay); on["roast"] && r != "" {
+			b.WriteString(r + "\n")
+		}
+		b.WriteString("\n🔮 ")
+		b.WriteString(g.Prediction.FormatPrediction())
+		if on["kicker"] {
+			b.WriteString("\n" + pick(springKickers, seed))
+		}
+		return b.String()
+	})
+	return Post{Text: text, HoroscopeText: g.HoroscopeText, Prediction: g.Prediction}
+}
+
+var springKickers = []string{
+	"Half the lineup will be wearing numbers in the 80s.",
+	"The stars are also just getting loose.",
+	"Results not valid in the regular season.",
+	"Cactus League rules: nothing matters and the sun is out.",
 }
 
 // ── Season rollover ──────────────────────────────────────────────────
 
 func FormatRollover(s prediction.SeasonSummary, newSeason int) string {
-	text := fmt.Sprintf("🧹 New season, new model.\n\nThe %d predictions (%d/%d, %s) have been archived. Every weight is reset to factory settings. The stars have forgotten everything.\n\nSo have we. Mostly. %d starts now. 🏔️",
+	text := fmt.Sprintf("🧹 New season, new model.\n\nThe %d predictions (%d/%d, %s) have been archived. Every weight is reset to factory settings. The stars have forgotten everything.\n\nSo have we. Mostly. Some things can't be unseen. %d starts now. 🏔️",
 		s.Season, s.Correct, s.Predictions, pct(s.Accuracy), newSeason)
 	return Fit(text, MaxPostLength)
 }

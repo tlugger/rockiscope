@@ -3,6 +3,12 @@ package bluesky
 import (
 	"math"
 	"testing"
+	"time"
+
+	"github.com/tlugger/rockiscope/internal/formatter"
+	"github.com/tlugger/rockiscope/internal/horoscope"
+	"github.com/tlugger/rockiscope/internal/mlb"
+	"github.com/tlugger/rockiscope/internal/prediction"
 )
 
 func TestParsePredictionPost_GameDay(t *testing.T) {
@@ -124,5 +130,28 @@ func TestParsePredictionPost_NudgeVictory(t *testing.T) {
 	}
 	if math.Abs(pp.WinProb-0.53) > 0.001 {
 		t.Errorf("winProb = %f, want %f", pp.WinProb, 0.53)
+	}
+}
+
+// The voiced posts must stay parseable by the backfill.
+func TestParsePredictionPost_VoicedFormat(t *testing.T) {
+	post := formatter.FormatGameDay(formatter.GameDayPost{
+		Game: &mlb.Game{
+			GamePk: 1, GameDateTime: time.Date(2026, 4, 8, 19, 10, 0, 0, time.UTC), IsHome: true, Venue: "Coors Field",
+			HomeTeam: mlb.TeamInfo{ID: 115, Name: "Colorado Rockies"}, AwayTeam: mlb.TeamInfo{ID: 117, Name: "Houston Astros"},
+		},
+		Record:     &mlb.TeamRecord{Wins: 5, Losses: 6, StreakCode: "L4"},
+		Pitcher:    &mlb.PitcherStats{FullName: "Michael Lorenzen", ERA: 9, GamesStarted: 3},
+		Horoscope:  &horoscope.Horoscope{Text: "You might enjoy this day by being lazy, but you won't feel so good when night comes."},
+		Prediction: prediction.Prediction{WinProbability: 0.45, Pick: "L", Confidence: "A slight celestial nudge toward"},
+	})
+	pp := ParsePredictionPost(post.Text, "2026-04-08")
+	if pp == nil || pp.Opponent != "Houston Astros" || pp.Predicted != "L" || pp.WinProb < 0.449 || pp.WinProb > 0.451 {
+		t.Fatalf("parsed %+v from:\n%s", pp, post.Text)
+	}
+
+	off := formatter.FormatOffDay(formatter.OffDayPost{Record: &mlb.TeamRecord{Wins: 5, Losses: 6}})
+	if ParsePredictionPost(off.Text, "2026-04-09") != nil {
+		t.Errorf("off day parsed as a prediction:\n%s", off.Text)
 	}
 }

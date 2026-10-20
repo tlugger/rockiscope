@@ -39,13 +39,21 @@ Weights start at the values above but shift over time based on what's actually p
 After each game, Rockiscope posts a follow-up reply with the result:
 - **Correct prediction**: 
 ```
-🌙 Planets aligned. Opponent declined.
-📊 Rockies W | 4-3 | Season: 7/10 correct
+🧊 Cold, predictable, cosmically certified disappointment.
+
+🏁 Rockies L
+📊 Colorado Rockies 3-11 Los Angeles Dodgers
+
+🎯 41/63 correct predictions this season
 ```
 - **Wrong**: 
 ```
-🔮 Retrograde strikes again. So did the opponent.
-📊 Rockies L | 7-3 | Season: 6/10 correct
+📉 Prediction busted. Vibes immaculate.
+
+🏁 Rockies W
+📊 Colorado Rockies 6-5 Los Angeles Dodgers
+
+🎯 41/64 correct predictions this season
 ```
 
 ## 📺 Live Game Threads
@@ -175,23 +183,27 @@ tail -f /home/pi/rockiscope/rockiscope.log  # logs
 
 ## ✨ Sample Posts
 
-Each post includes the game info and prediction as text, with the full horoscope rendered as an attached image card — crescent moon, constellation, and all.
+Each post includes the game info and prediction as text, with the full horoscope rendered as an attached image card — crescent moon, constellation, and all. The bot quotes one line of the day's horoscope back at you and reacts to it. The extras (horoscope roast, ERA and streak reactions, the closing line) drop out first when a post runs long; the facts and the prediction always fit.
 
 **Game Day** (1 hour before first pitch):
 ```
-⚾ Rockies vs Houston Astros
-🕐 1:10 PM MDT at Coors Field
-🪖 Michael Lorenzen (9.00 ERA, 0-1)
-📊 5-6 | vs HOU: 2-1 | W2
+⚾ Rockies @ San Francisco Giants
+🕐 7:40 PM MDT at Oracle Park
+🪖 Chase Dollander (2.88 ERA, 6-4). Trustworthy. For now.
+📊 35-48 | W4. Hot. Don't touch it.
+📜 Horoscope: "almost total burnout." Forwarding to the lineup.
 
-🔮 A slight celestial nudge toward a Rockies defeat (55%)
+🔮 A cosmic coin flip, leaning toward a Rockies victory (53%)
+Saturn abstained.
 ```
 📎 Attached: horoscope image card
 
 **Off Day** (10 AM MST):
 ```
-⚾ No Rockies game today.
-📊 5-6 (.455) | Run Diff: -3 | L1
+⚾ No Rockies game today. The cosmos have granted a reprieve.
+📊 22-41 (.349) | Run Diff: -88 | L4. That's not a typo.
+
+📜 Horoscope: "you won't feel like talking or socializing with anyone." Saving it for the homestand.
 ```
 📎 Attached: horoscope image card
 
