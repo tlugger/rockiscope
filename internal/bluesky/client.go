@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/tlugger/rockiscope/internal/retry"
@@ -95,7 +96,8 @@ type Poster interface {
 	Reply(text string, image *ImageData, parentURI, rootURI string) (*PostRef, error)
 }
 
-// Client posts to Bluesky via the AT Protocol XRPC API.
+// Client posts to Bluesky via the AT Protocol XRPC API. It's safe for
+// concurrent use: the daily scheduler and the live-game watcher share one.
 type Client struct {
 	baseURL    string
 	httpClient *http.Client
@@ -103,8 +105,17 @@ type Client struct {
 	password   string
 	accessJwt  string
 	did        string
-	logger     *log.Logger
-	sleep      func(time.Duration)
+	// pdsURL is the account's actual PDS (bsky.social is only the entryway);
+	// the video service needs it to mint upload tokens.
+	pdsURL string
+	logger *log.Logger
+	sleep  func(time.Duration)
+
+	// mu serializes posting, which re-authenticates and mutates the session.
+	mu sync.Mutex
+	// Overridable in tests.
+	videoURL    string
+	mediaClient *http.Client
 }
 
 func NewClient(username, password string, logger *log.Logger) *Client {
@@ -144,6 +155,12 @@ func (c *Client) authenticateWithURL(url string) error {
 	var result struct {
 		AccessJwt string `json:"accessJwt"`
 		DID       string `json:"did"`
+		DIDDoc    struct {
+			Service []struct {
+				ID              string `json:"id"`
+				ServiceEndpoint string `json:"serviceEndpoint"`
+			} `json:"service"`
+		} `json:"didDoc"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&result); err != nil {
 		return fmt.Errorf("decoding auth response: %w", err)
@@ -155,6 +172,12 @@ func (c *Client) authenticateWithURL(url string) error {
 
 	c.accessJwt = result.AccessJwt
 	c.did = result.DID
+	c.pdsURL = c.baseURL
+	for _, svc := range result.DIDDoc.Service {
+		if svc.ID == "#atproto_pds" && svc.ServiceEndpoint != "" {
+			c.pdsURL = svc.ServiceEndpoint
+		}
+	}
 	return nil
 }
 
@@ -166,35 +189,75 @@ func (c *Client) sleepFn() func(time.Duration) {
 }
 
 func (c *Client) Post(text string, image *ImageData) (*PostRef, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return retry.DoWith(c.logger, "Bluesky post", c.sleepFn(), func() (*PostRef, error) {
 		if err := c.Authenticate(); err != nil {
 			return nil, err
 		}
-		return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, nil, nil, nil, nil)
+		embed, err := c.imageEmbed(image)
+		if err != nil {
+			return nil, err
+		}
+		return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, embed, nil, nil, nil, nil)
 	})
 }
 
 func (c *Client) Reply(text string, image *ImageData, parentURI, rootURI string) (*PostRef, error) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	return retry.DoWith(c.logger, "Bluesky reply", c.sleepFn(), func() (*PostRef, error) {
 		if err := c.Authenticate(); err != nil {
 			return nil, err
 		}
-		parentCID, err := c.GetRecordCID(parentURI)
+		embed, err := c.imageEmbed(image)
 		if err != nil {
-			return nil, fmt.Errorf("fetching parent CID: %w", err)
+			return nil, err
 		}
-		rootCID := parentCID
-		if rootURI != "" && rootURI != parentURI {
-			rootCID, err = c.GetRecordCID(rootURI)
-			if err != nil {
-				return nil, fmt.Errorf("fetching root CID: %w", err)
-			}
-		}
-		return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, image, &parentURI, &rootURI, &parentCID, &rootCID)
+		return c.replyWithEmbed(text, embed, parentURI, rootURI)
 	})
 }
 
-func (c *Client) createRecord(url, text string, image *ImageData, parentURI, rootURI, parentCID, rootCID *string) (*PostRef, error) {
+// replyWithEmbed creates a reply record. The caller must be authenticated.
+func (c *Client) replyWithEmbed(text string, embed map[string]interface{}, parentURI, rootURI string) (*PostRef, error) {
+	parentCID, err := c.GetRecordCID(parentURI)
+	if err != nil {
+		return nil, fmt.Errorf("fetching parent CID: %w", err)
+	}
+	rootCID := parentCID
+	if rootURI != "" && rootURI != parentURI {
+		rootCID, err = c.GetRecordCID(rootURI)
+		if err != nil {
+			return nil, fmt.Errorf("fetching root CID: %w", err)
+		}
+	}
+	return c.createRecord(c.baseURL+"/xrpc/com.atproto.repo.createRecord", text, embed, &parentURI, &rootURI, &parentCID, &rootCID)
+}
+
+func (c *Client) imageEmbed(image *ImageData) (map[string]interface{}, error) {
+	if image == nil || len(image.Bytes) == 0 {
+		return nil, nil
+	}
+	blob, err := c.uploadBlob(image.Bytes, "image/png")
+	if err != nil {
+		return nil, fmt.Errorf("uploading image: %w", err)
+	}
+	return map[string]interface{}{
+		"$type": "app.bsky.embed.images",
+		"images": []map[string]interface{}{
+			{
+				"alt":   image.Alt,
+				"image": blob,
+				"aspectRatio": map[string]interface{}{
+					"width":  image.Width,
+					"height": image.Height,
+				},
+			},
+		},
+	}, nil
+}
+
+func (c *Client) createRecord(url, text string, embed map[string]interface{}, parentURI, rootURI, parentCID, rootCID *string) (*PostRef, error) {
 	if c.accessJwt == "" || c.did == "" {
 		return nil, fmt.Errorf("not authenticated — call Authenticate() first")
 	}
@@ -204,25 +267,8 @@ func (c *Client) createRecord(url, text string, image *ImageData, parentURI, roo
 		"text":      text,
 		"createdAt": time.Now().UTC().Format(time.RFC3339),
 	}
-
-	if image != nil && len(image.Bytes) > 0 {
-		blob, err := c.uploadBlob(image.Bytes, "image/png")
-		if err != nil {
-			return nil, fmt.Errorf("uploading image: %w", err)
-		}
-		rec["embed"] = map[string]interface{}{
-			"$type": "app.bsky.embed.images",
-			"images": []map[string]interface{}{
-				{
-					"alt":   image.Alt,
-					"image": blob,
-					"aspectRatio": map[string]interface{}{
-						"width":  image.Width,
-						"height": image.Height,
-					},
-				},
-			},
-		}
+	if embed != nil {
+		rec["embed"] = embed
 	}
 
 	if parentURI != nil && *parentURI != "" {

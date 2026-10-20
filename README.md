@@ -48,6 +48,32 @@ After each game, Rockiscope posts a follow-up reply with the result:
 📊 Rockies L | 7-3 | Season: 6/10 correct
 ```
 
+## 📺 Live Game Threads
+
+Once the prediction is posted, the bot watches the game and replies in the same thread as it happens. Each game thread has three parts: the pregame prediction, a live update for every notable play, and the final result.
+
+**What counts as notable:** scoring plays, home runs, and any play that swings win probability by 10+ points or comes in a high-leverage spot (leverage index ≥ 2).
+
+For each one, Rockiscope:
+1. **Waits for the highlight.** MLB usually publishes the clip 1–3 minutes after the play. The bot matches it by `playId` and uploads it as inline video. If the daily video quota is used up or the upload fails, it falls back to a link card. If no clip shows up within 10 minutes, it posts without one.
+2. **Reads the birth charts.** It compares the batter's sign against the pitcher's. Elements form a food chain: water douses fire, fire consumes air, air erodes earth, earth absorbs water. Modality breaks ties. Then it reacts, loudly, based on what happened (a homer, a strikeout, a double play) and the personality of whichever sign came out ahead or got burned.
+3. **Corrects science.** MLB's real win probability is the baseline. When the stars favored the player who came through, they amplify the swing. When the play defied the stars, they call it a fluke and claw some of it back. Leverage decides how loudly they weigh in. The correction starts from the pregame prediction and fades a little with each play, so the stars never stray more than 12 points from science.
+
+```
+💥 Top 2 · TB 2, CLE 0
+Jonathan Aranda's RBI single
+
+♊ Aranda's air erodes ♉ Messick's earth.
+AS FORETOLD. Aranda with the hit. Pure Gemini behavior: two personalities and BOTH can hit.
+😬 Big moment · 86 mph off the bat
+🔮 Rays' win chances: science 73% (▲9) · the stars 78% (▲8)
+```
+📎 Attached: the highlight clip
+
+The final result post replies to the last update and attaches a chart of science vs. the stars across the whole game. This works for Rockies regular-season games and the adopted postseason team.
+
+**Reboot-proof.** Each thread is saved to `live_threads.json` after every change: the last post, the stars' running correction, and the plays still waiting on clips. A supervisor checks every 2 minutes that each game in progress has a watcher, and restarts one after a crash or power cut. Plays that ended more than 15 minutes before the bot came back are skipped, so a reboot never floods the thread with old news. Live updates have their own budget of 15 per game, so they never count against the daily post cap.
+
 ## 🗓️ The Other Six Months
 
 The Rockies' season ends in September. Rockiscope's doesn't. The bot reads MLB's season calendar and changes modes on its own:
@@ -143,7 +169,7 @@ tail -f /home/pi/rockiscope/rockiscope.log  # logs
 
 ## 📊 Data Sources
 
-- **MLB Stats API** — free, no auth, real-time game data + stats
+- **MLB Stats API** — free, no auth, real-time game data + stats, live win probability and highlight clips
 - **Horoscope.com** — daily Cancer horoscope
 - **Bluesky AT Protocol** — posting via XRPC API
 

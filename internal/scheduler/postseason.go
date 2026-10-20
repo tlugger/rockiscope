@@ -255,6 +255,7 @@ func (s *Scheduler) predictAdoptedGames(season int, a adoption, b bracket, r *ti
 		}
 		key := fmt.Sprintf("ps:pred:%d", g.GamePk)
 		if s.done(key) {
+			s.registerPostseasonLive(s.findPick(pickPostseason, g.GamePk))
 			continue
 		}
 		due, missed := s.pregameWindow(g.GameDateTime, r)
@@ -285,6 +286,7 @@ func (s *Scheduler) predictAdoptedGames(season int, a adoption, b bracket, r *ti
 			})
 			s.saveSeasonState()
 		}
+		s.registerPostseasonLive(s.findPick(pickPostseason, g.GamePk))
 		s.pollForResult(g.GameDateTime, r)
 	}
 }
@@ -357,6 +359,16 @@ func (s *Scheduler) settlePostseasonPicks(season int, b bracket, r *tickResult) 
 			s.pollForResult(g.GameDateTime, r)
 			continue
 		}
+		// The result continues the live thread, so let it finish first.
+		wrap, ready := s.liveWrapUp(p.GamePk)
+		if !ready {
+			r.wakeAt(r.now.Add(2 * time.Minute))
+			continue
+		}
+		parent := p.PostURI
+		if wrap.ParentURI != "" {
+			parent = wrap.ParentURI
+		}
 
 		result := "L"
 		if team.IsWinner {
@@ -374,11 +386,12 @@ func (s *Scheduler) settlePostseasonPicks(season int, b bracket, r *tickResult) 
 			PicksRecord:  s.picksRecord(pickPostseason, season),
 			Seed:         p.GamePk,
 		})
-		if _, err := s.postOnce(fmt.Sprintf("ps:reply:%d", p.GamePk), text, nil, p.PostURI, p.PostURI); err != nil {
+		if _, err := s.postOnce(fmt.Sprintf("ps:reply:%d", p.GamePk), text, wrap.Chart, parent, p.PostURI); err != nil {
 			p.Result = ""
 			r.fail("adopted game result", err)
 			continue
 		}
+		s.liveFinish(p.GamePk)
 		p.Score = fmt.Sprintf("%d-%d", team.Score, opp.Score)
 		p.TeamScore, p.OppScore = team.Score, opp.Score
 		p.SeriesResult = g.SeriesResult

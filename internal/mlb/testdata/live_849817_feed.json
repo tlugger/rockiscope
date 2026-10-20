@@ -1,0 +1,282 @@
+{
+ "gameData": {
+  "status": {
+   "abstractGameState": "Final",
+   "detailedState": "Final"
+  },
+  "teams": {
+   "away": {
+    "id": 139,
+    "name": "Tampa Bay Rays",
+    "abbreviation": "TB"
+   },
+   "home": {
+    "id": 114,
+    "name": "Cleveland Guardians",
+    "abbreviation": "CLE"
+   }
+  },
+  "players": {
+   "ID670764": {
+    "id": 670764,
+    "fullName": "Taylor Walls",
+    "birthDate": "1996-07-10"
+   },
+   "ID542888": {
+    "id": 542888,
+    "fullName": "Shawn Armstrong",
+    "birthDate": "1990-09-11"
+   },
+   "ID669330": {
+    "id": 669330,
+    "fullName": "Tyler Wells",
+    "birthDate": "1994-08-26"
+   },
+   "ID571927": {
+    "id": 571927,
+    "fullName": "Steven Matz",
+    "birthDate": "1991-05-29"
+   },
+   "ID622761": {
+    "id": 622761,
+    "fullName": "Jorge Mateo",
+    "birthDate": "1995-06-23"
+   },
+   "ID668723": {
+    "id": 668723,
+    "fullName": "Ryan Vilade",
+    "birthDate": "1999-02-18"
+   },
+   "ID595978": {
+    "id": 595978,
+    "fullName": "Austin Hedges",
+    "birthDate": "1992-08-18"
+   },
+   "ID663993": {
+    "id": 663993,
+    "fullName": "Nathaniel Lowe",
+    "birthDate": "1995-07-07"
+   },
+   "ID802415": {
+    "id": 802415,
+    "fullName": "Chandler Simpson",
+    "birthDate": "2000-11-18"
+   },
+   "ID683953": {
+    "id": 683953,
+    "fullName": "Travis Bazzana",
+    "birthDate": "2002-08-28"
+   },
+   "ID607259": {
+    "id": 607259,
+    "fullName": "Nick Martinez",
+    "birthDate": "1990-08-05"
+   },
+   "ID592155": {
+    "id": 592155,
+    "fullName": "Cam Booser",
+    "birthDate": "1992-05-04"
+   },
+   "ID676356": {
+    "id": 676356,
+    "fullName": "Jonny DeLuca",
+    "birthDate": "1998-07-10"
+   },
+   "ID672275": {
+    "id": 672275,
+    "fullName": "Patrick Bailey",
+    "birthDate": "1999-05-29"
+   },
+   "ID642121": {
+    "id": 642121,
+    "fullName": "Cole Sulser",
+    "birthDate": "1990-03-12"
+   },
+   "ID681807": {
+    "id": 681807,
+    "fullName": "David Fry",
+    "birthDate": "1995-11-20"
+   },
+   "ID671922": {
+    "id": 671922,
+    "fullName": "Cade Smith",
+    "birthDate": "1999-05-09"
+   },
+   "ID608070": {
+    "id": 608070,
+    "fullName": "Jos\u00e9 Ram\u00edrez",
+    "birthDate": "1992-09-17"
+   },
+   "ID689414": {
+    "id": 689414,
+    "fullName": "Liam Hicks",
+    "birthDate": "1999-06-02"
+   },
+   "ID680757": {
+    "id": 680757,
+    "fullName": "Steven Kwan",
+    "birthDate": "1997-09-05"
+   },
+   "ID811315": {
+    "id": 811315,
+    "fullName": "Brody Hopkins",
+    "birthDate": "2002-01-18"
+   },
+   "ID682657": {
+    "id": 682657,
+    "fullName": "Angel Mart\u00ednez",
+    "birthDate": "2002-01-27"
+   },
+   "ID643377": {
+    "id": 643377,
+    "fullName": "Griffin Jax",
+    "birthDate": "1994-11-22"
+   },
+   "ID650490": {
+    "id": 650490,
+    "fullName": "Yandy D\u00edaz",
+    "birthDate": "1991-08-08"
+   },
+   "ID682982": {
+    "id": 682982,
+    "fullName": "Daniel Espino",
+    "birthDate": "2001-01-05"
+   },
+   "ID810938": {
+    "id": 810938,
+    "fullName": "Ben Williamson",
+    "birthDate": "2000-11-05"
+   },
+   "ID683748": {
+    "id": 683748,
+    "fullName": "Victor Mesa Jr.",
+    "birthDate": "2001-09-08"
+   },
+   "ID691406": {
+    "id": 691406,
+    "fullName": "Junior Caminero",
+    "birthDate": "2003-07-05"
+   },
+   "ID656876": {
+    "id": 656876,
+    "fullName": "Drew Rasmussen",
+    "birthDate": "1995-07-27"
+   },
+   "ID694197": {
+    "id": 694197,
+    "fullName": "Angel Genao",
+    "birthDate": "2004-05-19"
+   },
+   "ID800050": {
+    "id": 800050,
+    "fullName": "Chase DeLauter",
+    "birthDate": "2001-10-08"
+   },
+   "ID680700": {
+    "id": 680700,
+    "fullName": "Richie Palacios",
+    "birthDate": "1997-05-16"
+   },
+   "ID677944": {
+    "id": 677944,
+    "fullName": "Slade Cecconi",
+    "birthDate": "1999-06-24"
+   },
+   "ID693855": {
+    "id": 693855,
+    "fullName": "Ian Seymour",
+    "birthDate": "1998-12-13"
+   },
+   "ID677587": {
+    "id": 677587,
+    "fullName": "Brayan Rocchio",
+    "birthDate": "2001-01-13"
+   },
+   "ID690984": {
+    "id": 690984,
+    "fullName": "Petey Halpin",
+    "birthDate": "2002-05-26"
+   },
+   "ID670036": {
+    "id": 670036,
+    "fullName": "Matt Festa",
+    "birthDate": "1993-03-11"
+   },
+   "ID666176": {
+    "id": 666176,
+    "fullName": "Jo Adell",
+    "birthDate": "1999-04-08"
+   },
+   "ID687330": {
+    "id": 687330,
+    "fullName": "Kevin Kelly",
+    "birthDate": "1997-11-28"
+   },
+   "ID642547": {
+    "id": 642547,
+    "fullName": "Freddy Peralta",
+    "birthDate": "1996-06-04"
+   },
+   "ID666018": {
+    "id": 666018,
+    "fullName": "Jonathan Aranda",
+    "birthDate": "1998-05-23"
+   },
+   "ID663743": {
+    "id": 663743,
+    "fullName": "Nick Fortes",
+    "birthDate": "1996-11-11"
+   },
+   "ID800048": {
+    "id": 800048,
+    "fullName": "Parker Messick",
+    "birthDate": "2000-10-26"
+   },
+   "ID676282": {
+    "id": 676282,
+    "fullName": "Joey Cantillo",
+    "birthDate": "1999-12-18"
+   },
+   "ID681870": {
+    "id": 681870,
+    "fullName": "Erik Sabrowski",
+    "birthDate": "1997-10-31"
+   },
+   "ID668909": {
+    "id": 668909,
+    "fullName": "Gavin Williams",
+    "birthDate": "1999-07-26"
+   },
+   "ID683769": {
+    "id": 683769,
+    "fullName": "Hunter Gaddis",
+    "birthDate": "1998-04-09"
+   },
+   "ID641329": {
+    "id": 641329,
+    "fullName": "Bryan Baker",
+    "birthDate": "1994-12-02"
+   },
+   "ID682120": {
+    "id": 682120,
+    "fullName": "Tim Herrin",
+    "birthDate": "1996-10-08"
+   },
+   "ID676440": {
+    "id": 676440,
+    "fullName": "Tanner Bibee",
+    "birthDate": "1999-03-05"
+   },
+   "ID656492": {
+    "id": 656492,
+    "fullName": "Foster Griffin",
+    "birthDate": "1995-07-27"
+   },
+   "ID656775": {
+    "id": 656775,
+    "fullName": "Cedric Mullins",
+    "birthDate": "1994-10-01"
+   }
+  }
+ }
+}
