@@ -910,3 +910,69 @@ func TestCalculateSleepDuration_TieredPolling(t *testing.T) {
 		})
 	}
 }
+
+// fakeClocks drives sleepFor: wall is the system clock (which NTP can move),
+// mono is elapsed time (which only goes forward).
+type fakeClocks struct {
+	wall time.Time
+	mono time.Duration
+	// jumpAt moves the wall clock by jumpBy once mono passes it, like NTP
+	// correcting a stale boot clock.
+	jumpAt, jumpBy time.Duration
+	jumped         bool
+	sleeps         int
+}
+
+func (f *fakeClocks) sleep(d time.Duration) {
+	f.sleeps++
+	f.mono += d
+	f.wall = f.wall.Add(d)
+	if !f.jumped && f.jumpAt > 0 && f.mono >= f.jumpAt {
+		f.wall, f.jumped = f.wall.Add(f.jumpBy), true
+	}
+}
+
+func clockedScheduler(f *fakeClocks) *Scheduler {
+	return &Scheduler{
+		now:    func() time.Time { return f.wall },
+		sleep:  f.sleep,
+		mono:   func() time.Duration { return f.mono },
+		logger: testLogger(),
+	}
+}
+
+// Today's missed World Series pick: booted at a saved 12:25 (really 16:08),
+// planned to sleep 4h35m until the pregame window, and NTP moved the clock
+// forward 3h43m a minute in. The bot must wake and re-plan, not sleep to 20:43.
+func TestSleepFor_WakesWhenClockJumpsForward(t *testing.T) {
+	f := &fakeClocks{wall: time.Date(2026, 10, 26, 18, 25, 0, 0, time.UTC), jumpAt: time.Minute, jumpBy: 3*time.Hour + 43*time.Minute}
+	clockedScheduler(f).sleepFor(4*time.Hour + 35*time.Minute)
+	if f.mono > 2*time.Minute {
+		t.Errorf("slept %s of elapsed time after the clock jump; should re-plan within a minute", f.mono)
+	}
+}
+
+func TestSleepFor_WakesWhenClockJumpsBack(t *testing.T) {
+	f := &fakeClocks{wall: time.Date(2026, 10, 26, 18, 0, 0, 0, time.UTC), jumpAt: 5 * time.Minute, jumpBy: -2 * time.Hour}
+	clockedScheduler(f).sleepFor(6 * time.Hour)
+	if f.mono > 6*time.Minute {
+		t.Errorf("slept %s after the clock went back", f.mono)
+	}
+}
+
+func TestSleepFor_SteadyClockSleepsTheWholeTime(t *testing.T) {
+	f := &fakeClocks{wall: time.Date(2026, 10, 26, 18, 0, 0, 0, time.UTC)}
+	clockedScheduler(f).sleepFor(6 * time.Hour)
+	if f.mono != 6*time.Hour {
+		t.Errorf("slept %s, want 6h", f.mono)
+	}
+	if f.sleeps != 360 {
+		t.Errorf("%d naps, want one per minute", f.sleeps)
+	}
+
+	f = &fakeClocks{wall: time.Date(2026, 10, 26, 18, 0, 0, 0, time.UTC)}
+	clockedScheduler(f).sleepFor(90 * time.Second)
+	if f.mono != 90*time.Second {
+		t.Errorf("slept %s, want 90s", f.mono)
+	}
+}
