@@ -215,6 +215,27 @@ StandardError=append:$INSTALL_DIR/rockiscope.log
 WantedBy=multi-user.target
 EOF
 
+# A Pi has no hardware clock. After a power cut it boots with the last saved
+# time (hours stale) until NTP catches up, and time-sync.target means nothing
+# unless systemd-time-wait-sync is enabled. Enable it, but cap its wait so an
+# unreachable NTP server can't keep the bot down forever (the bot also waits
+# for sync itself, up to 30 minutes).
+if systemctl list-unit-files systemd-time-wait-sync.service &>/dev/null; then
+  mkdir -p /etc/systemd/system/systemd-time-wait-sync.service.d
+  printf '[Service]\nTimeoutStartSec=5min\n' > /etc/systemd/system/systemd-time-wait-sync.service.d/rockiscope.conf
+  systemctl enable systemd-time-wait-sync.service >/dev/null 2>&1 || true
+  ok "Boot waits for NTP time sync"
+fi
+
+# Keep the journal across reboots, so the next unexplained restart can be
+# traced back (by default it's lost at every power cut).
+if [ ! -d /var/log/journal ]; then
+  mkdir -p /var/log/journal
+  systemd-tmpfiles --create --prefix /var/log/journal >/dev/null 2>&1 || true
+  systemctl restart systemd-journald >/dev/null 2>&1 || true
+  ok "Persistent system journal enabled"
+fi
+
 systemctl daemon-reload
 systemctl enable "$SERVICE_NAME" >/dev/null 2>&1
 ok "Service enabled"

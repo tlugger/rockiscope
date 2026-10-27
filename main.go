@@ -11,6 +11,7 @@ import (
 	"net/http"
 
 	"github.com/tlugger/rockiscope/internal/bluesky"
+	"github.com/tlugger/rockiscope/internal/clock"
 	"github.com/tlugger/rockiscope/internal/horoscope"
 	"github.com/tlugger/rockiscope/internal/live"
 	"github.com/tlugger/rockiscope/internal/mlb"
@@ -103,6 +104,11 @@ func cmdRun(logger *log.Logger) {
 
 	username, password := requireCreds(logger)
 	poster := bluesky.NewClient(username, password, logger)
+
+	// Plan nothing on a stale clock. After a power cut the Pi boots with the
+	// last saved time, hours behind, until NTP corrects it; a schedule made
+	// before then sleeps right through the pregame window.
+	clock.WaitForSync(logger, time.Sleep, 5*time.Second, 30*time.Minute)
 
 	// Live game threads run beside the scheduler. Their state is on disk, so
 	// after a crash or power cut the supervisor resumes any game in progress.

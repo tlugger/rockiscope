@@ -23,6 +23,8 @@ type Scheduler struct {
 	poster     bluesky.Poster
 	now        func() time.Time
 	sleep      func(time.Duration)
+	// mono reports elapsed (monotonic) time for sleepFor; nil uses the real one.
+	mono    func() time.Duration
 	logger     *log.Logger
 	dataDir    string
 
@@ -245,7 +247,42 @@ func (s *Scheduler) Run() {
 	for {
 		sleepDur := s.iterate()
 		s.logger.Printf("sleeping for %s", sleepDur.Round(time.Minute))
-		s.sleep(sleepDur)
+		s.sleepFor(sleepDur)
+	}
+}
+
+const (
+	// sleepChunk bounds how long the scheduler sleeps between clock checks.
+	sleepChunk = time.Minute
+	// clockJump is how far the wall clock may drift from elapsed time during
+	// one sleep before the day is re-planned.
+	clockJump = 2 * time.Minute
+)
+
+// sleepFor sleeps d, but wakes early if the wall clock jumps. Go's sleep
+// measures elapsed time while the schedule is wall-clock time: after a power
+// cut the Pi boots hours behind, the bot plans "sleep 4h35m until the pregame
+// post", NTP fixes the clock a minute later, and the post sails by. Checking
+// every minute catches the jump and re-plans against the real time.
+func (s *Scheduler) sleepFor(d time.Duration) {
+	mono := s.mono
+	if mono == nil {
+		base := time.Now()
+		mono = func() time.Duration { return time.Since(base) }
+	}
+	startMono, startWall := mono(), s.now().Round(0)
+	for {
+		elapsed := mono() - startMono
+		wall := s.now().Round(0).Sub(startWall)
+		if elapsed >= d || wall >= d {
+			return
+		}
+		if drift := wall - elapsed; drift > clockJump || drift < -clockJump {
+			s.logger.Printf("system clock jumped %s while sleeping (now %s); re-planning",
+				drift.Round(time.Second), s.now().Format(time.RFC3339))
+			return
+		}
+		s.sleep(min(d-elapsed, sleepChunk))
 	}
 }
 
